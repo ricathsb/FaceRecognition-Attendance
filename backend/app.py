@@ -31,7 +31,7 @@ def attendance():
     # Tambahkan timestamp ISO 8601
     result['timestamp'] = datetime.now().isoformat()
     # Ganti key 'nama' ke 'name', jika tidak ada isi 'Unknown'
-    result['name'] = result.pop('nama', 'Unknown')
+    result['name'] = result.pop('nama')
     # Sertakan kembali image original (beserta prefix data:image/jpeg;base64,...)
     result['image'] = data['image']
 
