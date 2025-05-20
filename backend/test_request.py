@@ -2,7 +2,7 @@ import requests
 import base64
 
 # Path file gambarnya
-file_path = "data/known_faces/221401109_Muhammad Fadhlan Tanjung.jpg"
+file_path = "data/known_faces/NIM_NAMA"
 
 # Baca file gambar dan encode ke base64
 with open(file_path, "rb") as image_file:
