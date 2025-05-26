@@ -5,7 +5,9 @@ import Webcam from 'react-webcam';
 import { WebcamCaptureProps } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Camera, Loader2 } from 'lucide-react';
-
+export type WebcamCapturePropsExtended = WebcamCaptureProps & {
+  someExtraProp?: string; // misalnya kamu mau extend
+};
 export function WebcamCapture({ onCapture }: WebcamCaptureProps) {
   const webcamRef = useRef<Webcam>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -70,7 +72,7 @@ export function WebcamCapture({ onCapture }: WebcamCaptureProps) {
             Capturing...
           </>
         ) : (
-          'Mark Attendance'
+          'Take Picture'
         )}
       </Button>
     </div>

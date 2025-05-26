@@ -1,8 +1,10 @@
 import requests
 import base64
+import os
 
-# Path file gambarnya
-file_path = "data/known_faces/NIM_NAMA"
+# Dapatkan path absolut ke folder known_faces relatif ke lokasi file ini
+current_dir = os.path.dirname(os.path.abspath(__file__))
+file_path = os.path.join(current_dir, 'data', 'known_faces', '221401057_Han Ji Eun.jpeg')
 
 # Baca file gambar dan encode ke base64
 with open(file_path, "rb") as image_file:

@@ -1,6 +1,6 @@
 export interface AttendanceResponse {
   success: boolean;
-  name: string;
+  nama: string;
   nim: string;
   image: string;
   timestamp: string;

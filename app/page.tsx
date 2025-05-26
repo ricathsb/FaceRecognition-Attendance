@@ -1,3 +1,4 @@
+// app/page.tsx (Halaman Absensi - Halaman Utama)
 "use client";
 
 import { useState } from 'react';
@@ -8,6 +9,7 @@ import { FaceDetectionGuide } from '@/components/face-detection-guide';
 import { Navbar } from '@/components/navbar';
 import { AttendanceResponse } from '@/lib/types';
 import { motion } from 'framer-motion';
+import Link from 'next/link'; // <<--- TAMBAHKAN IMPORT INI
 
 export default function Home() {
   const [attendanceData, setAttendanceData] = useState<AttendanceResponse | null>(null);
@@ -32,7 +34,7 @@ export default function Home() {
   return (
     <>
       <Navbar />
-      <main className="container mx-auto px-4 py-8 flex flex-col items-center min-h-[calc(100vh-4rem)]">
+      <main className="container mx-auto px-4 py-8 flex flex-col items-center min-h-[calc(100vh-var(--navbar-height,4rem))]">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -46,6 +48,14 @@ export default function Home() {
             <p className="text-muted-foreground">
               Quickly mark your attendance with facial recognition
             </p>
+            {/* ---vvv--- TAMBAHKAN LINK DI SINI ---vvv--- */}
+            <p className="mt-4 text-sm"> {/* Tambahkan margin-top jika perlu */}
+              Belum terdaftar?{' '}
+              <Link href="/face-list" className="font-medium text-indigo-600 hover:text-indigo-500 hover:underline">
+                Daftarkan wajah Anda di sini
+              </Link>
+            </p>
+            {/* ---^^^--- AKHIR PENAMBAHAN LINK ---^^^--- */}
           </div>
 
           <FaceDetectionGuide />
