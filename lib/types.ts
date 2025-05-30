@@ -1,7 +1,7 @@
 export interface AttendanceResponse {
   success: boolean;
   nama: string;
-  nim: string;
+  nip: string;
   image: string;
   timestamp: string;
   message: string;

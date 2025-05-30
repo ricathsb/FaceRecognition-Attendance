@@ -28,12 +28,12 @@ export function AttendanceCard({ data, onReset }: AttendanceCardProps) {
           <CardContent className="pt-6">
             <div className="space-y-4">
               <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-500">Student Name</p>
+                <p className="text-sm font-medium text-gray-500">Teacher's Name</p>
                 <p className="text-lg font-semibold">{data.nama || '-'}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-500">Student ID</p>
-                <p className="text-lg font-mono">{data.nim || '-'}</p>
+                <p className="text-sm font-medium text-gray-500">Teacher's NIP</p>
+                <p className="text-lg font-mono">{data.nip || "-"}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-medium text-gray-500">Time</p>

@@ -1,0 +1,33 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Karyawan {
+  id            Int      @id @default(autoincrement())
+  nama          String
+  nip           String   @unique
+  foto_filename String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  face_embedding String?
+  // Relasi ke CatatanAbsensi: Seorang Karyawan bisa memiliki banyak CatatanAbsensi
+  catatanAbsensi CatatanAbsensi[]
+}
+
+model CatatanAbsensi {
+  id                Int      @id @default(autoincrement())
+  timestamp_absensi DateTime
+  status            String   // misalnya "masuk", "pulang", "izin", "sakit"
+  createdAt         DateTime @default(now())
+
+  // Relasi ke Karyawan
+  karyawan    Karyawan @relation(fields: [karyawanId], references: [id])
+  karyawanId  Int      // Ini adalah foreign key yang merujuk ke Karyawan.id
+}
