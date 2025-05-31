@@ -30,7 +30,7 @@ export function AttendanceForm({ onSuccess, onError, onLoading }: AttendanceForm
 
     if (response.success) {
       onSuccess({
-        nim: response.nim || 'Unknown',
+        nip: response.nip || 'Unknown',
         nama: response.nama || 'Unknown',
         timestamp: response.timestamp || new Date().toISOString(),
         image: response.image || null,

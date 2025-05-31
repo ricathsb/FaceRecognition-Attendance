@@ -6,12 +6,16 @@ import { Navbar } from '@/components/navbar';
 import { WebcamCapture, WebcamCapturePropsExtended } from '@/components/webcam-capture';
 import { FaceDetectionGuide } from '@/components/face-detection-guide';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+// Impor fungsi registerAccount dari lib/api.ts jika kamu membuatnya terpisah
+// import { registerAccount, RegisterResponse } from '@/lib/api'; // Contoh jika pakai fungsi terpisah
+
 export default function SignUpPage() {
   const [nama, setNama] = useState('');
-  const [nim, setNim] = useState('');
+  const [nip, setNip] = useState('');
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
@@ -27,8 +31,8 @@ export default function SignUpPage() {
   };
 
   const handleSubmit = async () => {
-    if (!nama || !nim || !imageSrc) {
-      setSubmitMessage("Nama, NIM, dan foto wajib diisi.");
+    if (!nama || !nip || !imageSrc) {
+      setSubmitMessage("Nama, NIP, dan foto wajib diisi.");
       return;
     }
 
@@ -36,22 +40,44 @@ export default function SignUpPage() {
     setSubmitMessage("Mendaftarkan akun...");
 
     try {
-    const response = await fetch('http://localhost:5000/register-face', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nama, nim, fotoWajah: imageSrc }),
-    });
-    const data = await response.json();
+      const response = await fetch('/api/karyawan/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nama, nip, fotoWajah: imageSrc }),
+      });
 
-    if (!response.ok) throw new Error(data.error || "Gagal mendaftar.");
+      // Selalu coba baca body respons, karena server mungkin mengirim pesan error dalam JSON
+      // bahkan jika statusnya bukan OK.
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        // Jika gagal parse JSON (misalnya server kirim HTML error mentah)
+        // dan statusnya juga tidak OK, maka ini masalah komunikasi/server error.
+        if (!response.ok) {
+          throw new Error(`Server error: ${response.status} ${response.statusText}. Respons bukan JSON.`);
+        }
+        // Jika status OK tapi bukan JSON, ini aneh, tapi kita throw error juga.
+        throw new Error("Respons dari server bukan JSON yang valid meskipun status OK.");
+      }
 
-    setSubmitMessage(`Pendaftaran untuk ${nama} (${nim}) berhasil! Anda akan diarahkan ke halaman absensi.`);
-    setTimeout(() => {
-      router.push('/');
-    }, 2500);
+      if (!response.ok) {
+        // Gunakan pesan error dari server (data.message) jika ada.
+        throw new Error(data.message || `Gagal mendaftar. Status: ${response.status}`);
+      }
+
+      setSubmitMessage(data.message || `Pendaftaran untuk ${nama} (${nip}) berhasil! Anda akan diarahkan ke halaman utama.`);
+      setTimeout(() => {
+        router.push('/');
+      }, 2500);
 
     } catch (error: any) {
-      setSubmitMessage(error.message || "Terjadi kesalahan saat pendaftaran.");
+      console.error("Error saat handleSubmit di SignUpPage:", error);
+      if (error.message.includes("Unexpected token '<'") || error.message.includes("Respons bukan JSON")) {
+        setSubmitMessage("Terjadi kesalahan komunikasi dengan server. Pastikan endpoint API sudah benar dan server tidak error (cek log server!).");
+      } else {
+        setSubmitMessage(error.message || "Terjadi kesalahan saat pendaftaran.");
+      }
       setIsSubmitting(false);
     }
   };
@@ -67,48 +93,46 @@ export default function SignUpPage() {
           className="w-full max-w-md space-y-6"
         >
           <div className="text-center">
-            <h1 className="text-3xl font-bold mb-2">Pendaftaran Akun Baru</h1>
+            <h1 className="text-3xl font-bold mb-2">Pendaftaran Akun Karyawan</h1>
             <p className="text-muted-foreground">Isi data dan ambil foto wajah Anda.</p>
           </div>
 
-          {/* BOX INPUT NAMA & NIM DENGAN STYLING CARD */}
           <div className="space-y-4 p-6 bg-card border rounded-lg shadow">
             <div>
               <label htmlFor="nama" className="block text-sm font-medium text-card-foreground mb-1">
                 Nama Lengkap
               </label>
-              <input
+              <Input
                 id="nama"
                 type="text"
                 value={nama}
                 onChange={handleChange(setNama)}
-                className="mt-1 block w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm bg-background"
+                className="mt-1 block w-full"
                 placeholder="Masukkan nama lengkap" required disabled={isSubmitting}
               />
             </div>
             <div>
-              <label htmlFor="nim" className="block text-sm font-medium text-card-foreground mb-1">
-                NIM (Nomor Induk Mahasiswa)
+              <label htmlFor="nip" className="block text-sm font-medium text-card-foreground mb-1">
+                NIP (Nomor Induk Pegawai)
               </label>
-              <input
-                id="nim"
+              <Input
+                id="nip"
                 type="text"
-                value={nim}
-                onChange={handleChange(setNim)}
-                className="mt-1 block w-full px-3 py-2 border border-border rounded-md shadow-sm focus:ring-primary focus:border-primary sm:text-sm bg-background"
-                placeholder="Masukkan NIM" required disabled={isSubmitting}
+                value={nip}
+                onChange={handleChange(setNip)}
+                className="mt-1 block w-full"
+                placeholder="Masukkan NIP" required disabled={isSubmitting}
               />
             </div>
           </div>
 
           <FaceDetectionGuide />
-
           <WebcamCapture onCapture={handleImageCaptured} />
 
           {imageSrc && !isSubmitting && (
             <div className="text-center">
               <p className="text-sm text-muted-foreground mb-2">Preview Foto:</p>
-              <img src={imageSrc} alt="Preview" className="w-48 h-auto rounded border" />
+              <img src={imageSrc} alt="Preview" className="w-48 h-auto rounded border mx-auto" />
             </div>
           )}
 
@@ -124,9 +148,9 @@ export default function SignUpPage() {
 
           <Button
             onClick={handleSubmit}
-            disabled={!nama || !nim || !imageSrc || isSubmitting}
-            size="xl"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            disabled={!nama || !nip || !imageSrc || isSubmitting}
+            size="lg"
+            className="w-full"
           >
             {isSubmitting ? (
               <>

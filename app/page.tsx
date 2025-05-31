@@ -9,7 +9,7 @@ import { FaceDetectionGuide } from '@/components/face-detection-guide';
 import { Navbar } from '@/components/navbar';
 import { AttendanceResponse } from '@/lib/types';
 import { motion } from 'framer-motion';
-import Link from 'next/link'; // <<--- TAMBAHKAN IMPORT INI
+import Link from 'next/link'; 
 
 export default function Home() {
   const [attendanceData, setAttendanceData] = useState<AttendanceResponse | null>(null);
