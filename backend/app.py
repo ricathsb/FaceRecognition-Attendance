@@ -214,7 +214,45 @@ def register_face():
     except Exception as e:
         app.logger.error(f"Flask: Error di endpoint /register-face: {str(e)}")
         return jsonify({'error': f'Flask: Terjadi kesalahan server internal: {str(e)}'}), 500
+    
+    
+# --- Endpoint Login ---
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    email = data.get('email')
+    password = data.get('password')
 
+    # Admin hardcoded
+    if email == 'admin@example.com' and password == 'admin123':
+        return jsonify({"message": "Login berhasil", "role": "admin"}), 200
+
+    # Login karyawan dari database
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Tidak bisa konek ke database"}), 503
+
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT nama FROM public."Karyawan"
+            WHERE email = %s AND password = %s
+        """, (email, password))
+        karyawan = cursor.fetchone()
+        if karyawan:
+            return jsonify({
+                "message": "Login berhasil",
+                "role": "user",
+                "nama": karyawan[0]
+            }), 200
+        else:
+            return jsonify({"message": "Email atau password salah"}), 401
+    except psycopg2.Error as db_err:
+        return jsonify({"error": f"Database error: {str(db_err)}"}), 500
+    finally:
+        cursor.close()
+        conn.close()
+            
 # --- Jalankan server ---
 if __name__ == '__main__': # Menggunakan __name__ standar Flask
     app.run(host='0.0.0.0', port=5000, debug=True)

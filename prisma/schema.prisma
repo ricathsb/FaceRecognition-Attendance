@@ -1,4 +1,5 @@
-// prisma/schema.prisma
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client-js"
@@ -9,25 +10,58 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Karyawan {
-  id            Int      @id @default(autoincrement())
-  nama          String
-  nip           String   @unique
-  foto_filename String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  face_embedding String?
-  // Relasi ke CatatanAbsensi: Seorang Karyawan bisa memiliki banyak CatatanAbsensi
-  catatanAbsensi CatatanAbsensi[]
-}
-
 model CatatanAbsensi {
   id                Int      @id @default(autoincrement())
   timestamp_absensi DateTime
-  status            String   // misalnya "masuk", "pulang", "izin", "sakit"
+  status            String
   createdAt         DateTime @default(now())
+  karyawanId        Int
+  karyawan          Karyawan @relation(fields: [karyawanId], references: [id], onDelete: Cascade)
 
-  // Relasi ke Karyawan
-  karyawan    Karyawan @relation(fields: [karyawanId], references: [id])
-  karyawanId  Int      // Ini adalah foreign key yang merujuk ke Karyawan.id
+  @@map("CatatanAbsensi")
 }
+
+model Karyawan {
+  id              Int      @id @default(autoincrement())
+  nama            String
+  nip             String   @unique
+  foto_filename   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  face_embedding  String?
+  email           String   @unique
+  password        String
+  
+  // Relasi
+  catatanAbsensi  CatatanAbsensi[]
+  absensiHarian   AbsensiHarian[]
+
+  @@map("Karyawan")
+}
+
+// Model baru untuk absensi harian
+model AbsensiHarian {
+  id          Int      @id @default(autoincrement())
+  karyawanId  Int
+  tanggal     DateTime @db.Date
+  jamMasuk    String?  // Format "HH:MM:SS"
+  jamKeluar   String?  // Format "HH:MM:SS" 
+  status      String   @default("absen") // 'hadir', 'telat', 'absen'
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relasi ke tabel Karyawan
+  karyawan    Karyawan @relation(fields: [karyawanId], references: [id], onDelete: Cascade)
+
+  // Constraint: satu record per karyawan per hari
+  @@unique([karyawanId, tanggal], name: "karyawan_tanggal_unique")
+  @@map("AbsensiHarian")
+}
+
+// Model admin yang di-comment karena masalah privileges
+// Uncomment jika diperlukan dan sudah fix masalah privileges
+// model admin {
+//   id       Int     @id @default(autoincrement())
+//   username String? @unique
+//   password String?
+// }

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Camera } from 'lucide-react';
 import { ModeToggle } from '@/components/mode-toggle';
+import { LogoutButton } from '@/components/ui/logout'; // pastikan ini sudah dibuat
 
 export function Navbar() {
   return (
@@ -10,10 +11,14 @@ export function Navbar() {
           <Camera className="h-6 w-6 text-blue-600" />
           <span className="hidden font-semibold sm:inline-block">Face Attendance</span>
         </Link>
-        
-        <div className="flex items-center space-x-4">
+
+        <div className="flex items-center space-x-6">
           <ModeToggle />
+          <LogoutButton />
         </div>
+
+
+
       </div>
     </header>
   );

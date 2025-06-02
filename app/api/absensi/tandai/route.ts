@@ -59,19 +59,19 @@ export async function POST(request: NextRequest) {
       },
     });
 
-   // ... di dalam fungsi POST ...
-const responsePayload: AttendanceResponse = {
-  success: true,
-  message: `Absensi untuk ${karyawan.nama} berhasil dicatat!`,
-  nama: karyawan.nama,
-  nip: karyawan.nip, // NIP dari data karyawan di DB
-  timestamp: timestampAbsensi.toISOString(),
-  status: statusAbsensi,
-  catatanId: newAttendanceRecord.id,
-  // image: imageData, // Jika kamu mau mengirim balik gambar absensi
-};
-console.log("Next.js API (/api/absensi/tandai) mengirim ke frontend:", responsePayload); // <--- TAMBAHKAN INI
-return NextResponse.json(responsePayload, { status: 200 });
+    // ... di dalam fungsi POST ...
+    const responsePayload: AttendanceResponse = {
+      success: true,
+      message: `Absensi untuk ${karyawan.nama} berhasil dicatat!`,
+      nama: karyawan.nama,
+      nip: karyawan.nip, // NIP dari data karyawan di DB
+      timestamp: timestampAbsensi.toISOString(),
+      status: statusAbsensi,
+      catatanId: newAttendanceRecord.id,
+      // image: imageData, // Jika kamu mau mengirim balik gambar absensi
+    };
+    console.log("Next.js API (/api/absensi/tandai) mengirim ke frontend:", responsePayload); // <--- TAMBAHKAN INI
+    return NextResponse.json(responsePayload, { status: 200 });
 
   } catch (error: any) {
     console.error("Error di API /api/absensi/tandai:", error);
