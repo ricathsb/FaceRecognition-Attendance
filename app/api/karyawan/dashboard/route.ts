@@ -51,24 +51,27 @@ export async function GET() {
       const id = absenData.id
 
       if (!hadirSet.has(absenData.karyawanId)) {
-        hadirSet.add(absenData.karyawanId)
-        hadir++
+      hadirSet.add(absenData.karyawanId)
+      hadir++
 
-        let kategori = "ontime"
-        if (status === "izin") kategori = "permission"
-        else if (status === "sakit") kategori = "sick"
-        else if (jam.isAfter(batasTepat) && jam.isBefore(batasTelat)) kategori = "late"
+      let kategori = "hadir"
 
-        if (kategori === "late") telat++
-
-        aktivitasTerbaru.push({
-          id,
-          name: nama,
-          action: `Check-in pada ${jam.format("HH:mm")}`,
-          time: jam.format("HH:mm"),
-          status: kategori,
-        })
+      if (jam.isAfter(batasTepat) && jam.isBefore(batasTelat)) {
+        kategori = "terlambat"
+        telat++
+      } else if (jam.isAfter(batasTelat)) {
+        kategori = "tidak"
       }
+
+      aktivitasTerbaru.push({
+        id,
+        name: nama,
+        action: `Check-in pada ${jam.format("HH:mm")}`,
+        time: jam.format("HH:mm"),
+        status: kategori,
+      })
+    }
+
     }
 
     absen = totalKaryawan - hadir

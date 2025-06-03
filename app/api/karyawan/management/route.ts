@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextRequest,NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import dayjs from "dayjs"
 
 export const dynamic = "force-dynamic"
 
-// GET: Mengambil data karyawan & absensi
 export async function GET() {
   try {
     const karyawanList = await prisma.karyawan.findMany({
@@ -24,14 +24,51 @@ export async function GET() {
       orderBy: { id: "desc" },
     })
 
+    if (!pengaturanAbsensi) {
+      return NextResponse.json(
+        { message: "Pengaturan absensi belum diatur." },
+        { status: 400 }
+      )
+    }
+
+    // Konversi waktu aturan ke menit
+   // Konversi string waktu (HH:mm) menjadi menit
+    const timeToMinutes = (time: string) => {
+      const [jam, menit] = time.split(":").map(Number)
+      return jam * 60 + menit
+    }
+
+    // Ambil menit dari waktu mulai absen
+    const waktuMulaiMenit = timeToMinutes(pengaturanAbsensi.waktuMulaiAbsen)
+    const batasTepatMenit = timeToMinutes(pengaturanAbsensi.batasTepatWaktu)
+    const batasTerlambatMenit = timeToMinutes(pengaturanAbsensi.batasTerlambat)
+
     const hasil = karyawanList.map((karyawan) => {
       const attendance: { [tanggal: string]: string } = {}
 
       karyawan.catatanAbsensi.forEach((absen) => {
-        const tanggal = absen.timestamp_absensi.toISOString().split("T")[0]
-        const status = absen.status.toLowerCase()
-        attendance[tanggal] =
-          status === "hadir" || status === "masuk" ? "hadir" : "tidak"
+        const tanggal = dayjs(absen.timestamp_absensi).format("YYYY-MM-DD")
+        const jamAbsen = dayjs(absen.timestamp_absensi).format("HH:mm")
+        const absenMenit = timeToMinutes(jamAbsen)
+
+        let status = "tidak hadir"
+
+        if (
+          absen.status.toLowerCase() === "hadir" ||
+          absen.status.toLowerCase() === "masuk"
+        ) {
+          const selisihMenit = absenMenit - waktuMulaiMenit
+
+          if (selisihMenit <= batasTepatMenit) {
+            status = "hadir"
+          } else if (selisihMenit <= batasTerlambatMenit) {
+            status = "terlambat"
+          }
+        }
+
+        if (!(tanggal in attendance)) {
+          attendance[tanggal] = status
+        }
       })
 
       return {
@@ -43,10 +80,11 @@ export async function GET() {
       }
     })
 
+
     return NextResponse.json(
       {
         employees: hasil,
-        attendanceSettings: pengaturanAbsensi ?? null,
+        attendanceSettings: pengaturanAbsensi,
       },
       { status: 200 }
     )
@@ -58,6 +96,7 @@ export async function GET() {
     )
   }
 }
+
 
 // PUT: Menyimpan pengaturan absensi
 export async function PUT(req: Request) {
@@ -103,6 +142,7 @@ export async function PUT(req: Request) {
   }
 }
 
+// DELETE: Hapus data karyawan dan absensinya
 export async function DELETE(req: NextRequest) {
   try {
     const body = await req.json()
