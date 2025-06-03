@@ -24,8 +24,8 @@ CORS(app, resources={r"/*": {"origins": "*"}}) # Izinkan semua origin untuk deve
 # --- Konfigurasi Database (HARUS DISESUAIKAN) ---
 DB_HOST = os.environ.get("DB_HOST", "localhost")
 DB_NAME = os.environ.get("DB_NAME", "face_recognation") # Sesuaikan
-DB_USER = os.environ.get("DB_USER", "USER_DB_ANDA") # GANTI
-DB_PASS = os.environ.get("DB_PASS", "PASSWORD_DB_ANDA") # GANTI
+DB_USER = os.environ.get("DB_USER", "postgres") # GANTI
+DB_PASS = os.environ.get("DB_PASS", "3421") # GANTI
 
 def get_db_connection():
     try:
