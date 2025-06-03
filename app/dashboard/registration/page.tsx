@@ -166,60 +166,67 @@ export default function RegistrationPage() {
     }
 
     const handleSubmit = async () => {
-        if (!imageSrc) {
-            setSubmitMessage("Foto wajah wajib diambil")
-            return
-        }
-
-        setIsSubmitting(true)
-        setSubmitMessage("Mendaftarkan karyawan...")
-
-        try {
-            // Pastikan data tidak null/undefined
-            const requestData = {
-                nama: formData.nama || "",
-                nip: formData.nip || "",
-                email: formData.email || "",
-                password: formData.password || "",
-                fotoWajah: imageSrc || "",
-            }
-
-            const response = await fetch("/api/karyawan/register", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(requestData),
-            })
-
-            const data = await response.json()
-
-            if (!response.ok) {
-                throw new Error(data.message || `HTTP Error: ${response.status}`)
-            }
-
-            setSubmitMessage(data.message || `Pendaftaran ${formData.nama} berhasil!`)
-
-            // Reset form setelah berhasil
-            setTimeout(() => {
-                setFormData({
-                    nama: "",
-                    nip: "",
-                    email: "",
-                    password: "",
-                })
-                setImageSrc(null)
-                setCurrentStep(1)
-                setSubmitMessage(null)
-                setIsNipValid(true)
-            }, 4000)
-        } catch (error: any) {
-            console.error("Registration error:", error)
-            setSubmitMessage(`Error: ${error.message || "Terjadi kesalahan saat pendaftaran"}`)
-        } finally {
-            setIsSubmitting(false)
-        }
+    if (!imageSrc) {
+        setSubmitMessage("Foto wajah wajib diambil");
+        return;
     }
+
+    setIsSubmitting(true);
+    setSubmitMessage("Mendaftarkan karyawan...");
+
+    try {
+        const requestData = {
+            nama: formData.nama || "",
+            nip: formData.nip || "",
+            email: formData.email || "",
+            password: formData.password || "",
+            fotoWajah: imageSrc || "",
+        };
+
+        const response = await fetch("/api/karyawan/register", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(requestData),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            // Tangani error dari backend, termasuk error dari Flask
+            if (data.error?.includes("wajah")) {
+                setSubmitMessage("Gagal: Wajah tidak terdeteksi. Pastikan wajah terlihat jelas.");
+            } else {
+                setSubmitMessage(data.error || data.message || `HTTP Error: ${response.status}`);
+            }
+            return;
+        }
+
+        // Kalau sukses:
+        setSubmitMessage(data.message || `Pendaftaran ${formData.nama} berhasil!`);
+
+        // Reset form setelah beberapa detik
+        setTimeout(() => {
+            setFormData({
+                nama: "",
+                nip: "",
+                email: "",
+                password: "",
+            });
+            setImageSrc(null);
+            setCurrentStep(1);
+            setSubmitMessage(null);
+            setIsNipValid(true);
+        }, 4000);
+
+    } catch (error: any) {
+        console.error("Registration error:", error);
+        setSubmitMessage(`Error: ${error.message || "Terjadi kesalahan saat pendaftaran"}`);
+    } finally {
+        setIsSubmitting(false);
+    }
+};
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">

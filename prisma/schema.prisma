@@ -18,6 +18,20 @@ model CatatanAbsensi {
   @@map("CatatanAbsensi")
 }
 
+model PengaturanAbsensi {
+  id               Int      @id @default(autoincrement())
+  waktuMulaiAbsen  String
+  batasTepatWaktu  String
+  batasTerlambat   String
+  hariKerja        String[] // array string PostgreSQL
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("PengaturanAbsensi")
+}
+
+
+
 model Karyawan {
   id             Int              @id @default(autoincrement())
   nama           String

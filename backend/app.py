@@ -139,82 +139,42 @@ def attendance():
 def register_face():
     data = request.get_json()
 
-    # Next.js akan mengirim NIP, nama (opsional), dan fotoWajah
     if not data or 'nip' not in data or 'fotoWajah' not in data:
-        return jsonify({'error': 'Data tidak lengkap dari Next.js: nip dan fotoWajah wajib diisi'}), 400
+        return jsonify({'error': 'Data tidak lengkap: nip dan fotoWajah wajib diisi'}), 400
 
     try:
-        nip_karyawan = data['nip']
-        # nama_karyawan = data.get('nama', 'Unknown') # Bisa diambil untuk logging
         image_b64_data_url = data['fotoWajah']
 
         if ',' not in image_b64_data_url:
             return jsonify({'error': 'Format data URL gambar tidak valid'}), 400
 
         header, image_b64 = image_b64_data_url.split(',', 1)
-        # file_extension = '.jpg' if 'image/jpeg' in header else '.png' # Tidak perlu simpan file di Flask
-
         image_data = base64.b64decode(image_b64)
         np_arr = np.frombuffer(image_data, np.uint8)
         image_cv2 = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
         if image_cv2 is None:
-            return jsonify({'error': 'Data gambar tidak valid setelah decode (Flask)'}), 400
+            return jsonify({'error': 'Gagal decode gambar (Flask)'}), 400
 
         face_locations = face_recognition.face_locations(image_cv2)
         if not face_locations:
             return jsonify({'error': 'Tidak ada wajah terdeteksi (Flask)'}), 400
         if len(face_locations) > 1:
-             return jsonify({'error': 'Terdeteksi lebih dari satu wajah. Harap pastikan hanya satu wajah di foto.'}), 400
+            return jsonify({'error': 'Terdeteksi lebih dari satu wajah. Harap gunakan foto satu wajah.'}), 400
 
+        # Dapatkan face encoding
         face_encoding_array = face_recognition.face_encodings(image_cv2, face_locations)[0]
-        face_encoding_list_of_python_floats = [float(val) for val in face_encoding_array]
-        face_encoding_str = str(face_encoding_list_of_python_floats) 
+        face_encoding_list = [float(val) for val in face_encoding_array]
 
-        # === LOGIKA BARU: Simpan/Update encoding ke Database ===
-        conn = get_db_connection()
-        if conn is None:
-            return jsonify({'error': 'Flask: Could not connect to database for registration.'}), 503
-        
-        cursor = conn.cursor()
-        try:
-            # Update kolom face_embedding di tabel Karyawan untuk NIP yang sesuai
-            # Pastikan tabel "Karyawan" dan kolom "face_embedding" sudah ada
-            cursor.execute(
-                """
-                UPDATE "Karyawan" 
-                SET face_embedding = %s, "updatedAt" = %s 
-                WHERE nip = %s
-                RETURNING nama 
-                """,
-                (face_encoding_str, datetime.now(), nip_karyawan)
-            )
-            updated_info = cursor.fetchone()
-            conn.commit()
-
-            if updated_info:
-                k_nama = updated_info[0]
-                app.logger.info(f"Flask: Face encoding untuk NIP {nip_karyawan} ({k_nama}) berhasil disimpan/diupdate ke DB.")
-                return jsonify({'message': f'Face encoding untuk {k_nama} (NIP: {nip_karyawan}) berhasil diproses dan disimpan.'}), 200 # 200 OK untuk update
-            else:
-                # Ini berarti NIP yang dikirim Next.js tidak ditemukan di tabel Karyawan.
-                # Alur di Next.js seharusnya sudah membuat record Karyawan terlebih dahulu.
-                app.logger.warning(f"Flask: Karyawan dengan NIP {nip_karyawan} tidak ditemukan di DB saat mencoba update face_embedding.")
-                return jsonify({'error': f'Karyawan dengan NIP {nip_karyawan} tidak ditemukan di database untuk diupdate.'}), 404
-        
-        except psycopg2.Error as db_err:
-            conn.rollback()
-            app.logger.error(f"Flask: Database error saat update face_embedding: {str(db_err)}")
-            return jsonify({'error': f'Flask Database error: {str(db_err)}'}), 500
-        finally:
-            if conn:
-                cursor.close()
-                conn.close()
+        return jsonify({
+            'face_encoding': face_encoding_list,
+            'message': 'Wajah berhasil dikenali dan diencode'
+        }), 200
 
     except Exception as e:
-        app.logger.error(f"Flask: Error di endpoint /register-face: {str(e)}")
-        return jsonify({'error': f'Flask: Terjadi kesalahan server internal: {str(e)}'}), 500
-    
+        app.logger.error(f"Flask error di /register-face: {str(e)}")
+        return jsonify({'error': f'Flask error: {str(e)}'}), 500
+
     
 # --- Endpoint Login ---
 @app.route('/api/login', methods=['POST'])
@@ -252,6 +212,8 @@ def login():
     finally:
         cursor.close()
         conn.close()
+
+        
             
 # --- Jalankan server ---
 if __name__ == '__main__': # Menggunakan __name__ standar Flask
