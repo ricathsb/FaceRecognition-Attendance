@@ -1,57 +1,73 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Users, UserCheck, UserX, Clock, Calendar, TrendingUp, Activity, Loader2, Bell } from "lucide-react"
-
-// Sample data - in real app this would come from API
-const getTodayData = () => {
-    const today = new Date()
-    return {
-        date: today.toLocaleDateString("id-ID", {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-        }),
-        totalKaryawan: 1215,
-        hadir: 1089,
-        absen: 45,
-        telat: 67,
-        lastUpdated: today.toLocaleTimeString("id-ID"),
-    }
-}
-
-const getRecentActivities = () => [
-    { id: 1, name: "Asep Samudin", action: "Check-in", time: "08:15", status: "ontime" },
-    { id: 2, name: "Nurlela Cantika", action: "Check-in", time: "08:45", status: "late" },
-    { id: 3, name: "Budi Santoso", action: "Izin", time: "07:30", status: "permission" },
-    { id: 4, name: "Siti Aminah", action: "Check-in", time: "08:00", status: "ontime" },
-    { id: 5, name: "Ahmad Fauzi", action: "Sakit", time: "06:45", status: "sick" },
-    { id: 6, name: "Rina Sari", action: "Check-in", time: "08:30", status: "late" },
-    { id: 7, name: "Dedi Kurniawan", action: "Check-in", time: "07:55", status: "ontime" },
-    { id: 8, name: "Maya Sari", action: "Check-in", time: "08:20", status: "late" },
-]
+import {
+    Users,
+    UserCheck,
+    UserX,
+    Clock,
+    Calendar,
+    TrendingUp,
+    Activity,
+    Loader2,
+} from "lucide-react"
 
 export default function DashboardPage() {
-    const [data, setData] = useState<ReturnType<typeof getTodayData> | null>(null)
-    const [activities, setActivities] = useState(getRecentActivities())
+    const [data, setData] = useState<{
+        date: string
+        totalKaryawan: number
+        hadir: number
+        absen: number
+        telat: number
+        lastUpdated: string
+    } | null>(null)
+
+    const [activities, setActivities] = useState<
+        {
+            id: number
+            name: string
+            action: string
+            time: string
+            status: string
+        }[]
+    >([])
+
     const [currentTime, setCurrentTime] = useState(new Date())
     const [isLoading, setIsLoading] = useState(true)
 
+    const fetchDashboardData = async () => {
+        try {
+            const response = await fetch("/api/karyawan/dashboard")
+            if (!response.ok) throw new Error("Gagal memuat data")
+
+            const result = await response.json()
+
+            setData({
+                date: new Date().toLocaleDateString("id-ID", {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                }),
+                totalKaryawan: result.totalKaryawan,
+                hadir: result.hadir,
+                absen: result.absen,
+                telat: result.telat,
+                lastUpdated: new Date().toLocaleTimeString("id-ID"),
+            })
+
+            setActivities(result.aktivitasTerbaru || [])
+            setIsLoading(false)
+        } catch (error) {
+            console.error("Error memuat data dashboard:", error)
+        }
+    }
+
     useEffect(() => {
-        // Set data saat pertama kali mount
-        setData(getTodayData())
-        setIsLoading(false)
+        fetchDashboardData()
 
-        // Update waktu setiap detik untuk jam real-time
-        const timer = setInterval(() => {
-            setCurrentTime(new Date())
-        }, 1000)
-
-        // Update data setiap menit
-        const dataTimer = setInterval(() => {
-            setData(getTodayData())
-        }, 60000)
+        const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+        const dataTimer = setInterval(() => fetchDashboardData(), 60000)
 
         return () => {
             clearInterval(timer)
@@ -59,7 +75,6 @@ export default function DashboardPage() {
         }
     }, [])
 
-    // Loading state
     if (isLoading || !data) {
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -148,7 +163,6 @@ export default function DashboardPage() {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-            {/* Header positioned near sidebar */}
             <div className="px-6 py-6 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                     <div>
@@ -176,9 +190,7 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            {/* Main Content */}
             <div className="p-6">
-                {/* Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     {statsCards.map((card, index) => (
                         <div
@@ -186,16 +198,15 @@ export default function DashboardPage() {
                             className={`${card.bgColor} rounded-2xl p-6 border border-gray-200 dark:border-gray-700 transition-all duration-300 hover:shadow-xl hover:scale-105 hover:-translate-y-1`}
                         >
                             <div className="flex items-center justify-between mb-4">
-                                <div
-                                    className={`w-12 h-12 bg-gradient-to-r ${card.color} rounded-xl flex items-center justify-center shadow-lg`}
-                                >
+                                <div className={`w-12 h-12 bg-gradient-to-r ${card.color} rounded-xl flex items-center justify-center shadow-lg`}>
                                     <card.icon className="h-6 w-6 text-white" />
                                 </div>
                                 <div
-                                    className={`text-xs px-2 py-1 rounded-full ${card.changeType === "increase"
+                                    className={`text-xs px-2 py-1 rounded-full ${
+                                        card.changeType === "increase"
                                             ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
                                             : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
-                                        }`}
+                                    }`}
                                 >
                                     {card.change}
                                 </div>
@@ -208,7 +219,6 @@ export default function DashboardPage() {
                     ))}
                 </div>
 
-                {/* Recent Activities */}
                 <div className="max-w-2xl mx-auto">
                     <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-8 shadow-sm">
                         <div className="flex items-center justify-between mb-6">
@@ -218,7 +228,6 @@ export default function DashboardPage() {
                                 </div>
                                 Aktivitas Terbaru
                             </h3>
-                            <Bell className="h-5 w-5 text-gray-400" />
                         </div>
 
                         <div className="space-y-4 max-h-96 overflow-y-auto">
@@ -240,10 +249,6 @@ export default function DashboardPage() {
                                 </div>
                             ))}
                         </div>
-
-                        <button className="w-full mt-6 py-3 text-sm font-medium text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900 rounded-xl transition-colors border border-blue-200 dark:border-blue-800">
-                            Lihat Semua Aktivitas
-                        </button>
                     </div>
                 </div>
             </div>
