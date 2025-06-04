@@ -1,125 +1,201 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter, usePathname } from "next/navigation"
-import { Users, UserPlus, LogOut, Menu, X, User, HomeIcon as HouseIcon } from "lucide-react"
+import type React from "react"
+import { useState, useCallback, forwardRef, createContext, useContext } from "react"
 import { cn } from "@/lib/utils"
 
-interface SidebarProps {
-    className?: string
+interface SidebarContextProps {
+    isOpen: boolean
+    toggleOpen: () => void
+    close: () => void
 }
 
-const navigation = [
-    {
-        name: "Dashboard",
-        href: "/dashboard",
-        icon: HouseIcon,
-    },
-    {
-        name: "Manajemen",
-        href: "/dashboard/management",
-        icon: Users,
-    },
-    {
-        name: "Pendaftaran",
-        href: "/dashboard/registration",
-        icon: UserPlus,
-    },
-]
+const SidebarContext = createContext<SidebarContextProps>({
+    isOpen: false,
+    toggleOpen: () => { },
+    close: () => { },
+})
 
-export function Sidebar({ className }: SidebarProps) {
-    const router = useRouter()
-    const pathname = usePathname()
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+export const useSidebar = () => useContext(SidebarContext)
 
-    const handleLogout = () => {
-        localStorage.removeItem("role")
-        localStorage.removeItem("nama")
-        router.push("/login")
-    }
+interface SidebarProviderProps {
+    children: React.ReactNode
+}
 
-    const toggleMobileMenu = () => {
-        setIsMobileMenuOpen(!isMobileMenuOpen)
-    }
+export function SidebarProvider({ children }: SidebarProviderProps) {
+    const [isOpen, setIsOpen] = useState(false)
+
+    const toggleOpen = useCallback(() => {
+        setIsOpen((open) => !open)
+    }, [])
+
+    const close = useCallback(() => {
+        setIsOpen(false)
+    }, [])
+
+    return <SidebarContext.Provider value={{ isOpen, toggleOpen, close }}>{children}</SidebarContext.Provider>
+}
+
+interface SidebarTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonElement> { }
+
+export const SidebarTrigger = forwardRef<HTMLButtonElement, SidebarTriggerProps>(({ className, ...props }, ref) => {
+    const { toggleOpen } = useSidebar()
+
+    return (
+        <button
+            ref={ref}
+            onClick={toggleOpen}
+            className={cn(
+                "inline-flex items-center justify-center rounded-md p-2 text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50",
+                className,
+            )}
+            {...props}
+        >
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+            <span className="sr-only">Toggle sidebar</span>
+        </button>
+    )
+})
+SidebarTrigger.displayName = "SidebarTrigger"
+
+interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
+    variant?: "default" | "inset"
+}
+
+export const Sidebar = forwardRef<HTMLDivElement, SidebarProps>(({ className, variant = "default", ...props }, ref) => {
+    const { isOpen, close } = useSidebar()
 
     return (
         <>
-            {/* Mobile menu button */}
-            <div className="lg:hidden fixed top-4 left-4 z-50">
-                <button onClick={toggleMobileMenu} className="p-2 rounded-md bg-primary text-primary-foreground shadow-lg">
-                    {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-                </button>
-            </div>
-
             {/* Mobile overlay */}
-            {isMobileMenuOpen && (
-                <div className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40" onClick={toggleMobileMenu} />
-            )}
+            {isOpen && <div className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden" onClick={close} />}
 
             {/* Sidebar */}
             <div
+                ref={ref}
                 className={cn(
-                    "fixed inset-y-0 left-0 z-40 w-64 bg-slate-900 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
-                    isMobileMenuOpen ? "translate-x-0" : "-translate-x-full",
+                    "fixed inset-y-0 left-0 z-50 w-64 transform bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
+                    isOpen ? "translate-x-0" : "-translate-x-full",
+                    variant === "inset" && "lg:rounded-lg lg:border lg:m-2",
                     className,
                 )}
-            >
-                <div className="flex flex-col h-full">
-                    {/* User Profile Section */}
-                    <div className="flex items-center justify-center p-6 border-b border-slate-700">
-                        <div className="flex flex-col items-center space-y-3">
-                            <div className="w-16 h-16 bg-slate-600 rounded-full flex items-center justify-center">
-                                <User className="h-8 w-8 text-slate-300" />
-                            </div>
-                            <div className="text-center">
-                                <p className="text-white font-medium">Admin</p>
-                                <p className="text-slate-400 text-sm">Administrator</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Navigation */}
-                    <nav className="flex-1 px-4 py-6 space-y-2">
-                        {navigation.map((item) => {
-                            const isActive = pathname === item.href
-                            return (
-                                <button
-                                    key={item.name}
-                                    onClick={() => {
-                                        router.push(item.href)
-                                        setIsMobileMenuOpen(false)
-                                    }}
-                                    className={cn(
-                                        "w-full flex items-center px-4 py-3 text-left rounded-lg transition-all duration-200 group",
-                                        isActive
-                                            ? "bg-blue-600 text-white shadow-lg"
-                                            : "text-slate-300 hover:bg-slate-800 hover:text-white",
-                                    )}
-                                >
-                                    <item.icon
-                                        className={cn(
-                                            "h-5 w-5 mr-3 transition-colors",
-                                            isActive ? "text-white" : "text-slate-400 group-hover:text-white",
-                                        )}
-                                    />
-                                    <span className="font-medium">{item.name}</span>
-                                </button>
-                            )
-                        })}
-                    </nav>
-
-                    {/* Logout Button */}
-                    <div className="p-4 border-t border-slate-700">
-                        <button
-                            onClick={handleLogout}
-                            className="w-full flex items-center px-4 py-3 text-slate-300 hover:bg-red-600 hover:text-white rounded-lg transition-all duration-200 group"
-                        >
-                            <LogOut className="h-5 w-5 mr-3 text-slate-400 group-hover:text-white transition-colors" />
-                            <span className="font-medium">Keluar</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
+                {...props}
+            />
         </>
     )
+})
+Sidebar.displayName = "Sidebar"
+
+interface SidebarHeaderProps extends React.HTMLAttributes<HTMLDivElement> { }
+
+export const SidebarHeader = forwardRef<HTMLDivElement, SidebarHeaderProps>(({ className, ...props }, ref) => {
+    return (
+        <div
+            ref={ref}
+            className={cn(
+                "flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700",
+                className,
+            )}
+            {...props}
+        />
+    )
+})
+SidebarHeader.displayName = "SidebarHeader"
+
+interface SidebarContentProps extends React.HTMLAttributes<HTMLDivElement> { }
+
+export const SidebarContent = forwardRef<HTMLDivElement, SidebarContentProps>(({ className, ...props }, ref) => {
+    return <div ref={ref} className={cn("flex-1 overflow-y-auto py-2", className)} {...props} />
+})
+SidebarContent.displayName = "SidebarContent"
+
+interface SidebarFooterProps extends React.HTMLAttributes<HTMLDivElement> { }
+
+export const SidebarFooter = forwardRef<HTMLDivElement, SidebarFooterProps>(({ className, ...props }, ref) => {
+    return (
+        <div
+            ref={ref}
+            className={cn(
+                "flex items-center justify-between h-16 px-4 border-t border-gray-200 dark:border-gray-700",
+                className,
+            )}
+            {...props}
+        />
+    )
+})
+SidebarFooter.displayName = "SidebarFooter"
+
+interface SidebarGroupProps extends React.HTMLAttributes<HTMLDivElement> { }
+
+export const SidebarGroup = forwardRef<HTMLDivElement, SidebarGroupProps>(({ className, ...props }, ref) => {
+    return <div ref={ref} className={cn("space-y-1 px-2", className)} {...props} />
+})
+SidebarGroup.displayName = "SidebarGroup"
+
+interface SidebarGroupLabelProps extends React.HTMLAttributes<HTMLDivElement> { }
+
+export const SidebarGroupLabel = forwardRef<HTMLDivElement, SidebarGroupLabelProps>(({ className, ...props }, ref) => {
+    return (
+        <div
+            ref={ref}
+            className={cn("px-2 py-1 text-sm font-medium text-gray-500 dark:text-gray-400", className)}
+            {...props}
+        />
+    )
+})
+SidebarGroupLabel.displayName = "SidebarGroupLabel"
+
+interface SidebarGroupContentProps extends React.HTMLAttributes<HTMLDivElement> { }
+
+export const SidebarGroupContent = forwardRef<HTMLDivElement, SidebarGroupContentProps>(
+    ({ className, ...props }, ref) => {
+        return <div ref={ref} className={cn("space-y-1", className)} {...props} />
+    },
+)
+SidebarGroupContent.displayName = "SidebarGroupContent"
+
+interface SidebarMenuProps extends React.HTMLAttributes<HTMLDivElement> { }
+
+export const SidebarMenu = forwardRef<HTMLDivElement, SidebarMenuProps>(({ className, ...props }, ref) => {
+    return <div ref={ref} className={cn("space-y-1", className)} {...props} />
+})
+SidebarMenu.displayName = "SidebarMenu"
+
+interface SidebarMenuItemProps extends React.HTMLAttributes<HTMLDivElement> { }
+
+export const SidebarMenuItem = forwardRef<HTMLDivElement, SidebarMenuItemProps>(({ className, ...props }, ref) => {
+    return <div ref={ref} className={cn("", className)} {...props} />
+})
+SidebarMenuItem.displayName = "SidebarMenuItem"
+
+interface SidebarMenuButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+    isActive?: boolean
 }
+
+export const SidebarMenuButton = forwardRef<HTMLButtonElement, SidebarMenuButtonProps>(
+    ({ className, isActive, ...props }, ref) => {
+        return (
+            <button
+                ref={ref}
+                className={cn(
+                    "flex items-center w-full px-3 py-2 text-sm font-medium rounded-md transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+                    isActive
+                        ? "bg-blue-500 text-white hover:bg-blue-600 dark:bg-blue-900 dark:hover:bg-blue-800"
+                        : "text-gray-900 dark:text-gray-100",
+                    className,
+                )}
+                {...props}
+            />
+        )
+    },
+)
+SidebarMenuButton.displayName = "SidebarMenuButton"
+
+interface SidebarSeparatorProps extends React.HTMLAttributes<HTMLDivElement> { }
+
+export const SidebarSeparator = forwardRef<HTMLDivElement, SidebarSeparatorProps>(({ className, ...props }, ref) => {
+    return <div ref={ref} className={cn("h-px bg-gray-200 dark:bg-gray-700 my-2 mx-2", className)} {...props} />
+})
+SidebarSeparator.displayName = "SidebarSeparator"
