@@ -14,10 +14,10 @@ type Employee = {
 }
 
 type AttendanceSettings = {
-  checkInStartTime: string // Format: "07:00" - Waktu mulai absen
-  onTimeBeforeHour: string // Format: "09:00" - Batas tepat waktu
-  lateBeforeHour: string // Format: "14:00" - Batas terlambat & waktu akhir absen
-  workDays: string[] // ["monday", "tuesday", etc.]
+  checkInStartTime: string
+  onTimeBeforeHour: string
+  lateBeforeHour: string
+  workDays: string[]
 }
 
 export default function ManagementPage() {
@@ -120,6 +120,7 @@ export default function ManagementPage() {
     }))
   }
 
+//apus data
   const handleDeleteEmployee = async (employeeId: string, employeeName: string) => {
     if (
       confirm(
@@ -165,7 +166,7 @@ export default function ManagementPage() {
     }
 
     try {
-      // API call would go here
+      // API call nyimpan pengaturan absensi
       const response = await fetch("/api/karyawan/management", {
         method: "PUT",
         headers: {
@@ -185,7 +186,7 @@ export default function ManagementPage() {
       alert("Terjadi kesalahan saat menyimpan pengaturan")
     }
   }
-
+// Cek otentikasi pengguna
   useEffect(() => {
     const fetchEmployeesAndSettings = async () => {
       try {

@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
 
     await fs.mkdir(uploadDir, { recursive: true })
     const filePath = path.join(uploadDir, fotoFilename)
-    await fs.writeFile(filePath, buffer)
+    await fs.writeFile(filePath, new Uint8Array(buffer))
 
     const fotoDbPath = `/uploads/karyawan_photos/${fotoFilename}`
     console.log("✅ Image saved to:", fotoDbPath)
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
         email,
         password, // NOTE: plaintext - disarankan untuk di-hash
         foto_filename: fotoDbPath,
-        face_embedding : encodedFaceString
+        face_embedding: encodedFaceString
       },
     })
 

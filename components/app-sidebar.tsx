@@ -14,7 +14,6 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
-    SidebarSeparator,
     useSidebar,
 } from "@/components/ui/sidebar"
 
@@ -61,7 +60,6 @@ export function AppSidebar() {
 
     const handleNavigation = (href: string) => {
         router.push(href)
-        // Close sidebar on mobile after navigation
         close()
     }
 
@@ -73,7 +71,7 @@ export function AppSidebar() {
                         <GraduationCap className="h-5 w-5 lg:h-7 lg:w-7 text-white" />
                     </div>
                     <div className="min-w-0 flex-1">
-                        <h2 className="text-base lg:text-lg font-bold text-gray-900 dark:text-white truncate">Admin Panel</h2>
+                        <h2 className="text-base lg:text-lg font-bold text-gray-900 dark:text-white truncate">Admin Dashboard</h2>
                         <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium truncate">MAS Al Ittihadiyah</p>
                     </div>
                 </div>

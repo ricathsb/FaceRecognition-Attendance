@@ -1,4 +1,4 @@
-import { NextRequest,NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import dayjs from "dayjs"
 
@@ -32,7 +32,7 @@ export async function GET() {
     }
 
     // Konversi waktu aturan ke menit
-   // Konversi string waktu (HH:mm) menjadi menit
+    // Konversi string waktu (HH:mm) menjadi menit
     const timeToMinutes = (time: string) => {
       const [jam, menit] = time.split(":").map(Number)
       return jam * 60 + menit
@@ -63,6 +63,9 @@ export async function GET() {
             status = "hadir"
           } else if (selisihMenit <= batasTerlambatMenit) {
             status = "terlambat"
+          }
+          else {
+            status = "tidak hadir"
           }
         }
 

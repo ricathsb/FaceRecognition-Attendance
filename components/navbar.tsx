@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { getUserRole, clearUserRole } from "@/lib/auth"
 import { LogOut, User } from "lucide-react"
+import { ModeToggle } from "./mode-toggle"
 
 export function Navbar() {
   const router = useRouter()
@@ -69,6 +70,10 @@ export function Navbar() {
             </div>
           </div>
 
+
+
+
+
           {/* Logout Button */}
           <Button
             variant="outline"
@@ -80,6 +85,6 @@ export function Navbar() {
           </Button>
         </div>
       </div>
-    </nav>
+    </nav >
   )
 }
