@@ -1,27 +1,29 @@
-import { NextResponse } from "next/server"
-import prisma from "@/lib/prisma"
-import dayjs from "dayjs"
-import "dayjs/locale/id"
-import utc from "dayjs/plugin/utc"
-import timezone from "dayjs/plugin/timezone"
+import { NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+import dayjs from "dayjs";
+import "dayjs/locale/id";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
 
-dayjs.extend(utc)
-dayjs.extend(timezone)
-dayjs.locale("id")
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.locale("id");
 
-export const dynamic = "force-dynamic"
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const now = dayjs().tz("Asia/Jakarta")
-    const todayStart = now.startOf("day").toDate()
-    const todayEnd = now.endOf("day").toDate()
+    const now = dayjs().tz("Asia/Jakarta");
+    const todayStart = now.startOf("day").toDate();
+    const todayEnd = now.endOf("day").toDate();
 
-    const pengaturan = await prisma.pengaturanAbsensi.findFirst()
+    // Ambil pengaturan absen
+    const pengaturan = await prisma.pengaturanAbsensi.findFirst();
     if (!pengaturan) {
-      return NextResponse.json({ error: "Pengaturan absen tidak ditemukan" }, { status: 404 })
+      return NextResponse.json({ error: "Pengaturan absen tidak ditemukan" }, { status: 404 });
     }
 
+    // Ambil data karyawan dan absensi hari ini
     const [totalKaryawan, semuaAbsensiHariIni] = await Promise.all([
       prisma.karyawan.count(),
       prisma.catatanAbsensi.findMany({
@@ -38,72 +40,52 @@ export async function GET() {
           timestamp_absensi: "desc",
         },
       }),
-    ])
+    ]);
 
-    const hadirSet = new Set()
-    let hadir = 0
-    let telat = 0
-    let absen = 0
-    const aktivitasTerbaru: any[] = []
-
-    const toMinutes = (timeStr: string) => {
-      const [h, m] = timeStr.split(":").map(Number)
-      return h * 60 + m
-    }
-
-    const waktuMulai = toMinutes(pengaturan.waktuMulaiAbsen)
-    const batasTepat = toMinutes(pengaturan.batasTepatWaktu)
-    const batasTerlambat = toMinutes(pengaturan.batasTerlambat)
+    const hadirSet = new Set<number>(); // Set karyawanId yang sudah absen
+    let hadir = 0;
+    let telat = 0;
+    const aktivitasTerbaru: any[] = [];
 
     for (const absenData of semuaAbsensiHariIni) {
-      const jam = dayjs(absenData.timestamp_absensi).tz("Asia/Jakarta")
-      const nama = absenData.karyawan.nama
-      const id = absenData.id
-      const karyawanId = absenData.karyawanId
+      const jam = dayjs(absenData.timestamp_absensi).tz("Asia/Jakarta");
+      const nama = absenData.karyawan.nama;
+      const id = absenData.id;
+      const karyawanId = absenData.karyawanId;
 
+      // Hanya hitung absen pertama per karyawan hari ini
       if (!hadirSet.has(karyawanId)) {
-        hadirSet.add(karyawanId)
+        hadirSet.add(karyawanId);
 
-        const jamAbsenStr = jam.format("HH:mm")
-        const menitAbsen = toMinutes(jamAbsenStr)
-        const selisih = menitAbsen - waktuMulai
+        if (absenData.status === "hadir" || absenData.status === "terlambat") {
+          if (absenData.status === "hadir") {
+            hadir++;
+          } else if (absenData.status === "terlambat") {
+            telat++;
+          }
 
-        let status: "ontime" | "late" | "absent" = "absent"
-
-        if (selisih <= batasTepat) {
-          status = "ontime"
-          hadir++
-        } else if (selisih <= batasTerlambat) {
-          status = "late"
-          hadir++
-          telat++
-        }
-
-        if (status !== "absent") {
           aktivitasTerbaru.push({
             id,
             name: nama,
             action: `Check-in pada ${jam.format("HH:mm")}`,
             time: jam.format("HH:mm"),
-            status,
-          })
+            status: absenData.status,
+          });
         }
       }
     }
 
-    // Hitung yang belum absen
-    const belumAbsen = totalKaryawan - hadirSet.size
-    absen += belumAbsen
+    const absen = totalKaryawan - hadirSet.size;
 
     return NextResponse.json({
       totalKaryawan,
       hadir,
-      absen,
       telat,
+      absen,
       aktivitasTerbaru,
-    })
+    });
   } catch (error) {
-    console.error("Gagal mengambil data dashboard:", error)
-    return NextResponse.json({ error: "Terjadi kesalahan server" }, { status: 500 })
+    console.error("Gagal mengambil data dashboard:", error);
+    return NextResponse.json({ error: "Terjadi kesalahan server" }, { status: 500 });
   }
 }
