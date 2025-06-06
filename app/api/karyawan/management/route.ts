@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import dayjs from "dayjs"
+import utc from "dayjs/plugin/utc"
+import timezone from "dayjs/plugin/timezone"
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
 
 export const dynamic = "force-dynamic"
 
@@ -31,31 +36,39 @@ export async function GET() {
       )
     }
 
-    // Konversi waktu aturan ke menit
-    // Konversi string waktu (HH:mm) menjadi menit
     const timeToMinutes = (time: string) => {
       const [jam, menit] = time.split(":").map(Number)
       return jam * 60 + menit
     }
 
-    // Ambil menit dari waktu mulai absen
     const waktuMulaiMenit = timeToMinutes(pengaturanAbsensi.waktuMulaiAbsen)
     const batasTepatMenit = timeToMinutes(pengaturanAbsensi.batasTepatWaktu)
     const batasTerlambatMenit = timeToMinutes(pengaturanAbsensi.batasTerlambat)
+
+    const now = dayjs().tz("Asia/Jakarta")
+    const selectedYear = now.year()
+    const selectedMonth = now.month() // 0-based index
+    const daysInMonth = now.daysInMonth()
+
+    const workDays = pengaturanAbsensi.hariKerja ?? [
+      "monday",
+      "tuesday",
+      "wednesday",
+      "thursday",
+      "friday",
+    ]
 
     const hasil = karyawanList.map((karyawan) => {
       const attendance: { [tanggal: string]: string } = {}
 
       karyawan.catatanAbsensi.forEach((absen) => {
-        const tanggal = dayjs(absen.timestamp_absensi).format("YYYY-MM-DD")
-        const jamAbsen = dayjs(absen.timestamp_absensi).format("HH:mm")
+        const timestampWIB = dayjs(absen.timestamp_absensi).tz("Asia/Jakarta")
+        const tanggal = timestampWIB.format("YYYY-MM-DD")
+        const jamAbsen = timestampWIB.format("HH:mm")
         const absenMenit = timeToMinutes(jamAbsen)
 
-        // 🟩 Filter: hanya hari ini dan sebelumnya
-        const today = dayjs().format("YYYY-MM-DD")
-        if (tanggal > today) {
-          return // Lewati jika tanggal absen adalah di masa depan
-        }
+        const today = now.format("YYYY-MM-DD")
+        if (tanggal > today) return
 
         let status = "tidak hadir"
 
@@ -64,7 +77,6 @@ export async function GET() {
           absen.status.toLowerCase() === "masuk"
         ) {
           const selisihMenit = absenMenit - waktuMulaiMenit
-
           if (selisihMenit <= batasTepatMenit) {
             status = "hadir"
           } else if (selisihMenit <= batasTerlambatMenit) {
@@ -74,12 +86,35 @@ export async function GET() {
           }
         }
 
-        // Pastikan hanya menulis untuk tanggal yang valid
         if (!(tanggal in attendance)) {
           attendance[tanggal] = status
         }
       })
 
+      // Hitung ringkasan hadir(terlambat)/hari kerja
+      let hadirCount = 0
+      let terlambatCount = 0
+      let totalWorkDays = 0
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const date = dayjs(`${selectedYear}-${selectedMonth + 1}-${d}`, "YYYY-M-D").tz("Asia/Jakarta")
+        const tanggalStr = date.format("YYYY-MM-DD")
+        const dayOfWeek = date.format("dddd").toLowerCase()
+
+        if (!workDays.includes(dayOfWeek)) continue
+
+        totalWorkDays++
+
+        if (!attendance[tanggalStr] && date.isBefore(now, "day")) {
+          attendance[tanggalStr] = "Absen"
+        }
+
+        const status = attendance[tanggalStr]
+        if (status === "hadir") hadirCount++
+        else if (status === "terlambat") terlambatCount++
+      }
+
+      const summary = `${hadirCount}(${terlambatCount})/${totalWorkDays}`
 
       return {
         id: karyawan.id,
@@ -87,9 +122,9 @@ export async function GET() {
         name: karyawan.nama,
         nip: karyawan.nip,
         attendance,
+        summary,
       }
     })
-
 
     return NextResponse.json(
       {
@@ -107,8 +142,6 @@ export async function GET() {
   }
 }
 
-
-// PUT: Menyimpan pengaturan absensi
 export async function PUT(req: Request) {
   try {
     const body = await req.json()
@@ -152,7 +185,6 @@ export async function PUT(req: Request) {
   }
 }
 
-// DELETE: Hapus data karyawan dan absensinya
 export async function DELETE(req: NextRequest) {
   try {
     const body = await req.json()
@@ -165,12 +197,10 @@ export async function DELETE(req: NextRequest) {
       )
     }
 
-    // Hapus semua data absensi karyawan dulu
     await prisma.catatanAbsensi.deleteMany({
       where: { karyawanId: Number(employeeId) },
     })
 
-    // Lalu hapus data karyawannya
     await prisma.karyawan.delete({
       where: { id: Number(employeeId) },
     })
