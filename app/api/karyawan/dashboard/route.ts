@@ -2,14 +2,18 @@ import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import dayjs from "dayjs"
 import "dayjs/locale/id"
+import utc from "dayjs/plugin/utc"
+import timezone from "dayjs/plugin/timezone"
 
+dayjs.extend(utc)
+dayjs.extend(timezone)
 dayjs.locale("id")
 
 export const dynamic = "force-dynamic"
 
 export async function GET() {
   try {
-    const now = dayjs()
+    const now = dayjs().tz("Asia/Jakarta")
     const todayStart = now.startOf("day").toDate()
     const todayEnd = now.endOf("day").toDate()
 
@@ -42,39 +46,48 @@ export async function GET() {
     let absen = 0
     const aktivitasTerbaru: any[] = []
 
-    const batasTepat = dayjs(`${now.format("YYYY-MM-DD")}T${pengaturan.batasTepatWaktu}`)
-    const batasTelat = dayjs(`${now.format("YYYY-MM-DD")}T${pengaturan.batasTerlambat}`)
+    const toMinutes = (timeStr: string) => {
+      const [h, m] = timeStr.split(":").map(Number)
+      return h * 60 + m
+    }
+
+    const waktuMulai = toMinutes(pengaturan.waktuMulaiAbsen)
+    const batasTepat = toMinutes(pengaturan.batasTepatWaktu)
+    const batasTerlambat = toMinutes(pengaturan.batasTerlambat)
 
     for (const absenData of semuaAbsensiHariIni) {
-      const jam = dayjs(absenData.timestamp_absensi)
+      const jam = dayjs(absenData.timestamp_absensi).tz("Asia/Jakarta")
       const nama = absenData.karyawan.nama
-      const statusDb = absenData.status.toLowerCase()
       const id = absenData.id
+      const karyawanId = absenData.karyawanId
 
-      if (!hadirSet.has(absenData.karyawanId)) {
-        hadirSet.add(absenData.karyawanId)
+      if (!hadirSet.has(karyawanId)) {
+        hadirSet.add(karyawanId)
 
-        let kategori = "hadir"
+        const jamAbsenStr = jam.format("HH:mm")
+        const menitAbsen = toMinutes(jamAbsenStr)
+        const selisih = menitAbsen - waktuMulai
 
-        // Tentukan kategori berdasarkan status dari database atau waktu
-        if (statusDb === "terlambat" || (jam.isAfter(batasTepat) && jam.isBefore(batasTelat))) {
-          kategori = "terlambat"
-          telat++
-        } else if (statusDb === "tidak hadir" || statusDb === "tidak" || jam.isAfter(batasTelat)) {
-          kategori = "tidak"
-          absen++
-        } else {
-          kategori = "hadir"
+        let status: "ontime" | "late" | "absent" = "absent"
+
+        if (selisih <= batasTepat) {
+          status = "ontime"
           hadir++
+        } else if (selisih <= batasTerlambat) {
+          status = "late"
+          hadir++
+          telat++
         }
 
-        aktivitasTerbaru.push({
-          id,
-          name: nama,
-          action: `Check-in pada ${jam.format("HH:mm")}`,
-          time: jam.format("HH:mm"),
-          status: kategori,
-        })
+        if (status !== "absent") {
+          aktivitasTerbaru.push({
+            id,
+            name: nama,
+            action: `Check-in pada ${jam.format("HH:mm")}`,
+            time: jam.format("HH:mm"),
+            status,
+          })
+        }
       }
     }
 
