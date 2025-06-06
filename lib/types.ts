@@ -1,5 +1,17 @@
 // Type definitions for the attendance system
+// Ubah definisi AttendanceResponse untuk mencocokkan dengan yang digunakan di AttendanceForm
 export interface AttendanceResponse {
+  success: boolean
+  nip: string
+  nama: string
+  timestamp: string
+  message: string
+  image?: string
+}
+
+// Jika masih perlu tipe data lama untuk kompatibilitas dengan bagian lain aplikasi,
+// kita bisa membuat tipe baru dengan nama berbeda
+export interface AttendanceResponseLegacy {
   id: string
   employeeName: string
   timestamp: string

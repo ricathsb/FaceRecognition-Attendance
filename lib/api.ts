@@ -64,15 +64,15 @@ export async function registerAccount(nama: string, nip: string, fotoWajah: stri
 
 /**
  * Fungsi untuk menandai absensi melalui API route Next.js.
- * @param imageData Gambar wajah dalam format base64 data URL.
- * @returns Promise<AttendanceResponse>
+ * @param imageData
+ * @returns 
  */
 export async function markAttendance(imageData: string): Promise<AttendanceResponse> {
   try {
-    const response = await fetch('/api/absensi/tandai', { // URL API route Next.js untuk absensi
+    const response = await fetch('/api/absensi/tandai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: imageData }), // Sesuai dengan yang diharapkan API /api/absensi/tandai
+      body: JSON.stringify({ image: imageData }),
     });
 
     const data = await response.json();
@@ -81,7 +81,7 @@ export async function markAttendance(imageData: string): Promise<AttendanceRespo
       throw new Error(data.message || `Gagal menandai absensi dari server. Status: ${response.status}`);
     }
 
-    // Sesuaikan field ini dengan apa yang benar-benar dikembalikan oleh API /api/absensi/tandai Anda
+   
     return {
       success: true,
       message: data.message || 'Absensi berhasil ditandai!',
@@ -89,8 +89,8 @@ export async function markAttendance(imageData: string): Promise<AttendanceRespo
       nip: data.nip,
       timestamp: data.timestamp,
       status: data.status,
-      imagePath: data.imagePath, // Opsional, jika ada
-      catatanId: data.catatanId, // Opsional, jika ada
+      imagePath: data.imagePath, 
+      catatanId: data.catatanId, 
     };
   } catch (error: any) {
     console.error('Error di fungsi markAttendance (lib/api.ts):', error);

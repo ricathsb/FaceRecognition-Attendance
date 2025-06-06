@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast"
 import { motion } from "framer-motion"
 import { AlertCircle, CheckCircle, Loader2, Camera, Zap } from "lucide-react"
 
+// Pastikan AttendanceFormProps menggunakan tipe yang benar
 export function AttendanceForm({ onSuccess, onError, onLoading }: AttendanceFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [captureStatus, setCaptureStatus] = useState<"idle" | "capturing" | "processing">("idle")
@@ -32,7 +33,7 @@ export function AttendanceForm({ onSuccess, onError, onLoading }: AttendanceForm
       // Show processing toast
       toast({
         title: "Memproses Absensi",
-        description: "Sedang memverifikasi wajah dan mencatat kehadiran...",
+        description: "Sedang memverifikasi identitas karyawan dan mencatat kehadiran...",
         duration: 3000,
       })
 
@@ -51,8 +52,8 @@ export function AttendanceForm({ onSuccess, onError, onLoading }: AttendanceForm
 
         onSuccess({
           success: true,
-          nip: response.nip || "Unknown",
-          nama: response.nama || "Unknown",
+          nip: response.nip || "",
+          nama: response.nama || "",
           timestamp: response.timestamp || new Date().toISOString(),
           message: response.message || "Absensi berhasil dicatat!",
           image: imageSrc, // Include the captured image
@@ -136,7 +137,7 @@ export function AttendanceForm({ onSuccess, onError, onLoading }: AttendanceForm
               <div>
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Memproses Absensi</h3>
                 <p className="text-gray-600 dark:text-gray-400">
-                  Sedang memverifikasi identitas dan mencatat kehadiran Anda
+                  Sedang memverifikasi wajah dan mencatat kehadiran karyawan...
                 </p>
               </div>
               <div className="flex justify-center space-x-1">
@@ -163,7 +164,6 @@ export function AttendanceForm({ onSuccess, onError, onLoading }: AttendanceForm
       >
         <WebcamCapture onCapture={handleCapture} />
       </motion.div>
-
 
 
 
