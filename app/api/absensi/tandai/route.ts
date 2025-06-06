@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     // 3. Catat absensi ke tabel CatatanAbsensi
     const timestampAbsensi = new Date();
-    const statusAbsensi = "masuk"; // Atau bisa lebih dinamis
+    const statusAbsensi = "masuk";  
 
     const newAttendanceRecord = await prisma.catatanAbsensi.create({
       data: {
@@ -68,7 +68,6 @@ export async function POST(request: NextRequest) {
       timestamp: timestampAbsensi.toISOString(),
       status: statusAbsensi,
       catatanId: newAttendanceRecord.id,
-      // image: imageData, // Jika kamu mau mengirim balik gambar absensi
     };
     console.log("Next.js API (/api/absensi/tandai) mengirim ke frontend:", responsePayload); // <--- TAMBAHKAN INI
     return NextResponse.json(responsePayload, { status: 200 });

@@ -1,18 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import {
-    Users,
-    UserCheck,
-    UserX,
-    Clock,
-    Calendar,
-    TrendingUp,
-    Activity,
-    Loader2,
-} from "lucide-react"
+import { Users, UserCheck, UserX, Clock, Calendar, TrendingUp, Activity, Loader2, AlertCircle } from "lucide-react"
+import { SidebarTrigger } from "@/components/ui/sidebar"
 
-export default function DashboardPage() {
+function DashboardContent() {
     const [data, setData] = useState<{
         date: string
         totalKaryawan: number
@@ -34,9 +26,11 @@ export default function DashboardPage() {
 
     const [currentTime, setCurrentTime] = useState(new Date())
     const [isLoading, setIsLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
 
     const fetchDashboardData = async () => {
         try {
+            setError(null)
             const response = await fetch("/api/karyawan/dashboard")
             if (!response.ok) throw new Error("Gagal memuat data")
 
@@ -60,6 +54,8 @@ export default function DashboardPage() {
             setIsLoading(false)
         } catch (error) {
             console.error("Error memuat data dashboard:", error)
+            setError("Gagal memuat data dashboard. Silakan coba lagi.")
+            setIsLoading(false)
         }
     }
 
@@ -75,18 +71,49 @@ export default function DashboardPage() {
         }
     }, [])
 
-    if (isLoading || !data) {
+    if (isLoading) {
         return (
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+            <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 dark:bg-gray-900 flex items-center justify-center">
                 <div className="text-center">
-                    <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
+                    <Loader2 className="h-12 w-12 animate-spin text-emerald-600 mx-auto mb-4" />
                     <p className="text-gray-600 dark:text-gray-400 text-lg">Memuat data dashboard...</p>
                 </div>
             </div>
         )
     }
 
-    const attendancePercentage = Math.round((data.hadir / data.totalKaryawan) * 100)
+    if (error) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 dark:bg-gray-900 flex items-center justify-center">
+                <div className="text-center max-w-md mx-auto p-6">
+                    <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Terjadi Kesalahan</h2>
+                    <p className="text-gray-600 dark:text-gray-400 mb-6">{error}</p>
+                    <button
+                        onClick={() => {
+                            setIsLoading(true)
+                            fetchDashboardData()
+                        }}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg transition-colors"
+                    >
+                        Coba Lagi
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
+    if (!data) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 dark:bg-gray-900 flex items-center justify-center">
+                <div className="text-center">
+                    <p className="text-gray-600 dark:text-gray-400 text-lg">Tidak ada data tersedia</p>
+                </div>
+            </div>
+        )
+    }
+
+    const attendancePercentage = data.totalKaryawan > 0 ? Math.round((data.hadir / data.totalKaryawan) * 100) : 0
 
     const statsCards = [
         {
@@ -96,7 +123,6 @@ export default function DashboardPage() {
             color: "from-blue-500 to-blue-600",
             bgColor: "bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900",
             textColor: "text-blue-600",
-            change: "+2.5%",
             changeType: "increase",
         },
         {
@@ -106,7 +132,7 @@ export default function DashboardPage() {
             color: "from-green-500 to-green-600",
             bgColor: "bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900",
             textColor: "text-green-600",
-            change: "+5.2%",
+            change: `${attendancePercentage}%`,
             changeType: "increase",
         },
         {
@@ -116,8 +142,8 @@ export default function DashboardPage() {
             color: "from-red-500 to-red-600",
             bgColor: "bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950 dark:to-red-900",
             textColor: "text-red-600",
-            change: "-1.8%",
             changeType: "decrease",
+            change: `${100 - attendancePercentage}%`,
         },
         {
             title: "Terlambat",
@@ -126,7 +152,7 @@ export default function DashboardPage() {
             color: "from-orange-500 to-orange-600",
             bgColor: "bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900",
             textColor: "text-orange-600",
-            change: "+0.5%",
+            change: data.totalKaryawan > 0 ? `${Math.round((data.telat / data.totalKaryawan) * 100)}%` : "0%",
             changeType: "increase",
         },
     ]
@@ -162,27 +188,26 @@ export default function DashboardPage() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-            <div className="px-6 py-6 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-gray-900 dark:to-gray-800 min-h-screen">
+            {/* Header */}
+            <div className="flex items-center gap-4 border-b border-emerald-100 dark:border-gray-700 pb-4">
+                <SidebarTrigger className="-ml-1 lg:hidden" />
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 flex-1">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard Manajemen</h1>
-                        <div className="flex items-center gap-4 mt-2">
+                        <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">Dashboard </h1>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-2">
                             <p className="text-gray-600 dark:text-gray-400 flex items-center gap-2">
                                 <Calendar className="h-4 w-4" />
-                                {data.date}
+                                <span className="text-sm">{data.date}</span>
                             </p>
-                            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                                <Activity className="h-4 w-4 text-green-500" />
-                                <span>Live Update</span>
-                            </div>
+
                         </div>
                     </div>
 
                     <div className="flex items-center gap-4">
-                        <div className="text-right bg-gray-50 dark:bg-gray-700 px-4 py-3 rounded-xl">
+                        <div className="text-right bg-white dark:bg-gray-700 px-4 py-3 rounded-xl shadow-sm border border-emerald-100 dark:border-gray-600">
                             <p className="text-sm text-gray-600 dark:text-gray-400">Waktu Sekarang</p>
-                            <p className="text-xl font-bold text-gray-900 dark:text-white font-mono">
+                            <p className="text-lg lg:text-xl font-bold text-gray-900 dark:text-white font-mono">
                                 {currentTime.toLocaleTimeString("id-ID")}
                             </p>
                         </div>
@@ -190,57 +215,62 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    {statsCards.map((card, index) => (
-                        <div
-                            key={index}
-                            className={`${card.bgColor} rounded-2xl p-6 border border-gray-200 dark:border-gray-700 transition-all duration-300 hover:shadow-xl hover:scale-105 hover:-translate-y-1`}
-                        >
-                            <div className="flex items-center justify-between mb-4">
-                                <div className={`w-12 h-12 bg-gradient-to-r ${card.color} rounded-xl flex items-center justify-center shadow-lg`}>
-                                    <card.icon className="h-6 w-6 text-white" />
-                                </div>
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
+                {statsCards.map((card, index) => (
+                    <div
+                        key={index}
+                        className={`${card.bgColor} rounded-2xl p-4 lg:p-6 border border-gray-200 dark:border-gray-700 transition-all duration-300 hover:shadow-xl hover:scale-105 hover:-translate-y-1`}
+                    >
+                        <div className="flex items-center justify-between mb-4">
+                            <div
+                                className={`w-10 h-10 lg:w-12 lg:h-12 bg-gradient-to-r ${card.color} rounded-xl flex items-center justify-center shadow-lg`}
+                            >
+                                <card.icon className="h-5 w-5 lg:h-6 lg:w-6 text-white" />
+                            </div>
+                            {card.change && (
                                 <div
-                                    className={`text-xs px-2 py-1 rounded-full ${
-                                        card.changeType === "increase"
-                                            ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-                                            : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
-                                    }`}
+                                    className={`text-xs px-2 py-1 rounded-full ${card.changeType === "increase"
+                                        ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                                        : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
+                                        }`}
                                 >
                                     {card.change}
                                 </div>
-                            </div>
-                            <div>
-                                <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">{card.title}</p>
-                                <p className={`text-3xl font-bold ${card.textColor}`}>{card.value.toLocaleString()}</p>
-                            </div>
+                            )}
                         </div>
-                    ))}
-                </div>
-
-                <div className="max-w-2xl mx-auto">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-8 shadow-sm">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                                <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
-                                    <TrendingUp className="h-4 w-4 text-white" />
-                                </div>
-                                Aktivitas Terbaru
-                            </h3>
+                        <div>
+                            <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">{card.title}</p>
+                            <p className={`text-2xl lg:text-3xl font-bold ${card.textColor}`}>{card.value.toLocaleString()}</p>
                         </div>
+                    </div>
+                ))}
+            </div>
 
+            {/* Activities */}
+            <div className="max-w-4xl mx-auto w-full">
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 lg:p-8 shadow-sm">
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                            <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
+                                <TrendingUp className="h-4 w-4 text-white" />
+                            </div>
+                            Aktivitas Terbaru
+                        </h3>
+                    </div>
+
+                    {activities.length > 0 ? (
                         <div className="space-y-4 max-h-96 overflow-y-auto">
                             {activities.map((activity) => (
                                 <div
                                     key={activity.id}
                                     className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                                 >
-                                    <div className="flex-1">
-                                        <p className="font-semibold text-gray-900 dark:text-white text-sm">{activity.name}</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400">{activity.action}</p>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{activity.name}</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{activity.action}</p>
                                     </div>
-                                    <div className="text-right">
+                                    <div className="text-right flex-shrink-0 ml-4">
                                         <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">{activity.time}</p>
                                         <span className={`text-xs px-3 py-1 rounded-full font-medium ${getStatusColor(activity.status)}`}>
                                             {getStatusText(activity.status)}
@@ -249,9 +279,18 @@ export default function DashboardPage() {
                                 </div>
                             ))}
                         </div>
-                    </div>
+                    ) : (
+                        <div className="text-center py-8">
+                            <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                            <p className="text-gray-500 dark:text-gray-400">Belum ada aktivitas hari ini</p>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
     )
+}
+
+export default function DashboardPage() {
+    return <DashboardContent />
 }

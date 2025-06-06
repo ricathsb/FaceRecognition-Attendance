@@ -1,4 +1,4 @@
-import { NextRequest,NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import dayjs from "dayjs"
 
@@ -32,7 +32,7 @@ export async function GET() {
     }
 
     // Konversi waktu aturan ke menit
-   // Konversi string waktu (HH:mm) menjadi menit
+    // Konversi string waktu (HH:mm) menjadi menit
     const timeToMinutes = (time: string) => {
       const [jam, menit] = time.split(":").map(Number)
       return jam * 60 + menit
@@ -51,6 +51,12 @@ export async function GET() {
         const jamAbsen = dayjs(absen.timestamp_absensi).format("HH:mm")
         const absenMenit = timeToMinutes(jamAbsen)
 
+        // 🟩 Filter: hanya hari ini dan sebelumnya
+        const today = dayjs().format("YYYY-MM-DD")
+        if (tanggal > today) {
+          return // Lewati jika tanggal absen adalah di masa depan
+        }
+
         let status = "tidak hadir"
 
         if (
@@ -63,13 +69,17 @@ export async function GET() {
             status = "hadir"
           } else if (selisihMenit <= batasTerlambatMenit) {
             status = "terlambat"
+          } else {
+            status = "tidak hadir"
           }
         }
 
+        // Pastikan hanya menulis untuk tanggal yang valid
         if (!(tanggal in attendance)) {
           attendance[tanggal] = status
         }
       })
+
 
       return {
         id: karyawan.id,

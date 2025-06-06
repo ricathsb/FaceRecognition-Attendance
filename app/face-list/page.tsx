@@ -138,8 +138,8 @@ export default function SignUpPage() {
 
                     {submitMessage && (
                         <p className={`text-sm text-center p-3 rounded-md ${submitMessage.includes('berhasil')
-                                ? 'bg-green-50 text-green-700 dark:bg-green-700/20 dark:text-green-300'
-                                : 'bg-red-50 text-red-700 dark:bg-red-700/20 dark:text-red-300'
+                            ? 'bg-green-50 text-green-700 dark:bg-green-700/20 dark:text-green-300'
+                            : 'bg-red-50 text-red-700 dark:bg-red-700/20 dark:text-red-300'
                             }`}>
                             {submitMessage}
                         </p>
