@@ -11,7 +11,7 @@ type Employee = {
   attendance: {
     [tanggal: string]: string
   }
-  summary: string // <--- tambahkan ini untuk data "12(3)/31"
+  summary: string
 }
 
 
@@ -89,30 +89,34 @@ export default function ManagementPage() {
     return month ? month.label : "Januari"
   }
 
-  const getAttendanceColor = (status: string) => {
-    switch (status) {
-      case "hadir":
-        return "bg-green-500"
-      case "terlambat":
-        return "bg-yellow-500"
-      case "Absen":
-        return "bg-red-500"
-
-    }
+ const getAttendanceColor = (status: string) => {
+  switch (status) {
+    case "hadir":
+    case "tepat waktu": 
+      return "bg-green-500"
+    case "terlambat":
+      return "bg-yellow-500"
+    case "absen":
+      return "bg-red-500"
+    default:
+      return "bg-gray-300" 
   }
+}
 
-  const getAttendanceText = (status: string) => {
-    switch (status) {
-      case "hadir":
-        return "H"
-      case "terlambat":
-        return "T"
-      case "Absen":
-        return "A"
-      default:
-        return
-    }
+const getAttendanceText = (status: string) => {
+  switch (status) {
+    case "hadir":
+    case "tepat waktu":
+      return "H"
+    case "terlambat":
+      return "T"
+    case "absen":
+      return "A"
+    default:
+      return "?"
   }
+}
+
 
   const handleWorkDayToggle = (day: string) => {
     setAttendanceSettings((prev) => ({
@@ -121,7 +125,7 @@ export default function ManagementPage() {
     }))
   }
 
-  //apus data
+//apus data
   const handleDeleteEmployee = async (employeeId: string, employeeName: string) => {
     if (
       confirm(
@@ -187,79 +191,75 @@ export default function ManagementPage() {
       alert("Terjadi kesalahan saat menyimpan pengaturan")
     }
   }
-  // Cek otentikasi pengguna
-  useEffect(() => {
-    const fetchEmployeesAndSettings = async () => {
-      try {
-        const res = await fetch("/api/karyawan/management")
-        const data = await res.json()
+// Cek otentikasi pengguna
+useEffect(() => {
+  const fetchEmployeesAndSettings = async () => {
+    try {
+      const res = await fetch("/api/karyawan/management")
+      const data = await res.json()
 
-        // Ambil tanggal hari ini
-        const now = new Date()
-        const today = now.getDate()
-        const currentMonth = now.getMonth() + 1
-        const currentYear = now.getFullYear()
+       console.log("📦 Data API:", data) // ⬅️ Tambahkan ini agar bisa dicek di console
 
-        const selectedMonthInt = parseInt(selectedMonth)
-        const selectedYearInt = parseInt(selectedYear)
-        const daysInMonth = new Date(selectedYearInt, selectedMonthInt, 0).getDate()
 
-        const weekdayMap = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+      const now = new Date()
+      const todayStr = now.toISOString().split("T")[0] // "2025-06-06"
+      const todayDateOnly = new Date(todayStr) // jam 00:00
 
-        let workDaysSetting = ["monday", "tuesday", "wednesday", "thursday", "friday"]
-        if (data.attendanceSettings) {
-          workDaysSetting = data.attendanceSettings.hariKerja ?? workDaysSetting
-          setAttendanceSettings({
-            checkInStartTime: data.attendanceSettings.waktuMulaiAbsen ?? "07:00",
-            onTimeBeforeHour: data.attendanceSettings.batasTepatWaktu ?? "09:00",
-            lateBeforeHour: data.attendanceSettings.batasTerlambat ?? "14:00",
-            workDays: workDaysSetting,
-          })
-        }
+      const selectedMonthInt = parseInt(selectedMonth)
+      const selectedYearInt = parseInt(selectedYear)
+      const daysInMonth = new Date(selectedYearInt, selectedMonthInt, 0).getDate()
 
-        if (Array.isArray(data.employees)) {
-          const filledData = data.employees.map((employee: Employee) => {
-            const newAttendance = { ...employee.attendance }
+      const weekdayMap = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
 
-            for (let day = 1; day < today; day++) {
-              const date = new Date(selectedYearInt, selectedMonthInt - 1, day)
-              const dayOfWeek = weekdayMap[date.getDay()]
-              const dayStr = day.toString().padStart(2, "0")
-              const dateStr = `${selectedYear}-${selectedMonth}-${dayStr}`
-
-              const isPast =
-                selectedYearInt < currentYear ||
-                (selectedYearInt === currentYear &&
-                  (selectedMonthInt < currentMonth ||
-                    (selectedMonthInt === currentMonth && day < today)))
-
-              const isWorkDay = workDaysSetting.includes(dayOfWeek)
-
-              if (isPast && isWorkDay && !newAttendance[dateStr]) {
-                newAttendance[dateStr] = "Absen"
-              }
-            }
-
-            // Jika backend sudah hitung dan kirim summary:
-            const summary = employee.summary ?? "0(0)/0"
-
-            return {
-              ...employee,
-              attendance: newAttendance,
-              summary, // simpan ke state juga
-            }
-          })
-
-          setEmployeeData(filledData)
-        }
-
-      } catch (error) {
-        console.error("Gagal memuat data karyawan dan pengaturan absensi:", error)
+      let workDaysSetting = ["monday", "tuesday", "wednesday", "thursday", "friday"]
+      if (data.attendanceSettings) {
+        workDaysSetting = data.attendanceSettings.hariKerja ?? workDaysSetting
+        setAttendanceSettings({
+          checkInStartTime: data.attendanceSettings.waktuMulaiAbsen ?? "07:00",
+          onTimeBeforeHour: data.attendanceSettings.batasTepatWaktu ?? "09:00",
+          lateBeforeHour: data.attendanceSettings.batasTerlambat ?? "14:00",
+          workDays: workDaysSetting,
+        })
       }
-    }
 
-    fetchEmployeesAndSettings()
-  }, [selectedMonth, selectedYear])
+      if (Array.isArray(data.employees)) {
+        const filledData = data.employees.map((employee: Employee) => {
+          const newAttendance = { ...employee.attendance }
+
+          for (let day = 1; day <= daysInMonth; day++) {
+            const date = new Date(selectedYearInt, selectedMonthInt - 1, day)
+            const dayOfWeek = weekdayMap[date.getDay()]
+            const dayStr = day.toString().padStart(2, "0")
+            const monthStr = selectedMonth.padStart(2, "0")
+            const dateStr = `${selectedYear}-${monthStr}-${dayStr}`
+
+            const isBeforeToday = date < todayDateOnly
+            const isWorkDay = workDaysSetting.includes(dayOfWeek)
+
+            if (isBeforeToday && isWorkDay && !newAttendance[dateStr]) {
+              newAttendance[dateStr] = "absen"
+            }
+          }
+
+          const summary = employee.summary ?? "0(0)/0"
+
+          return {
+            ...employee,
+            attendance: newAttendance,
+            summary,
+          }
+        })
+
+        setEmployeeData(filledData)
+      }
+
+    } catch (error) {
+      console.error("Gagal memuat data karyawan dan pengaturan absensi:", error)
+    }
+  }
+
+  fetchEmployeesAndSettings()
+}, [selectedMonth, selectedYear])
 
 
 
@@ -506,17 +506,17 @@ export default function ManagementPage() {
                     </th>
                   </tr>
                 </thead>
-                <tbody>
-                  {filteredEmployees.map((emp) => (
-                    <tr key={emp.id} className="hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-colors">
-                      <td className="h-16 w-24 px-3 text-center border-b">
-                        <div className="flex items-center justify-center font-mono text-sm text-gray-700 dark:text-gray-200">
-                          {emp.summary}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
+               <tbody>
+                {filteredEmployees.map((emp) => (
+                  <tr key={emp.id} className="hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-colors">
+                    <td className="h-16 w-24 px-3 text-center border-b">
+                      <div className="flex items-center justify-center font-mono text-sm text-gray-700 dark:text-gray-200">
+                        {emp.summary}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
               </table>
             </div>
 

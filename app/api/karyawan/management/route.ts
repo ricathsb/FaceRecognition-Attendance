@@ -56,15 +56,16 @@ export async function GET() {
         const timestampWIB = dayjs(absen.timestamp_absensi).tz("Asia/Jakarta")
         const tanggal = timestampWIB.format("YYYY-MM-DD")
         const today = now.format("YYYY-MM-DD")
+
         if (tanggal > today) return
 
-        // Langsung kirim status original (toLowerCase) ke frontend
+        const status = absen.status.toLowerCase()
+
         if (!(tanggal in attendance)) {
-          attendance[tanggal] = absen.status.toLowerCase()
+          attendance[tanggal] = status
         }
       })
 
-      // Hitung ringkasan (berapa kali ada absen yang "hadir" atau "terlambat")
       let hadirCount = 0
       let terlambatCount = 0
       let totalWorkDays = 0
@@ -83,8 +84,13 @@ export async function GET() {
         }
 
         const status = attendance[tanggalStr]
-        if (status === "hadir") hadirCount++
-        else if (status === "terlambat") terlambatCount++
+
+        if (status === "tepat waktu") {
+          hadirCount++
+        } else if (status === "terlambat") {
+          hadirCount++
+          terlambatCount++
+        }
       }
 
       const summary = `${hadirCount}(${terlambatCount})/${totalWorkDays}`
@@ -115,7 +121,7 @@ export async function GET() {
   }
 }
 
-// PUT & DELETE endpoint tetap sama
+
 export async function PUT(req: Request) {
   try {
     const body = await req.json()

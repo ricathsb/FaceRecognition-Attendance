@@ -1,198 +1,131 @@
-import { type NextRequest, NextResponse } from "next/server"
-import prisma from "@/lib/prisma"
-import type { AttendanceResponse } from "@/lib/api"
+import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
+import { AttendanceResponse } from '@/lib/api';
 
-export const dynamic = "force-dynamic"
+export const dynamic = 'force-dynamic';
 
-const FLASK_ATTENDANCE_URL = "http://localhost:5000/attendance"
+const FLASK_ATTENDANCE_URL = 'http://localhost:5000/attendance';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { image: imageData } = body
+    const body = await request.json();
+    const { image: imageData } = body;
 
     if (!imageData) {
-      return NextResponse.json({ success: false, message: "Data gambar diperlukan." }, { status: 400 })
+      return NextResponse.json({ success: false, message: 'Data gambar diperlukan.' }, { status: 400 });
     }
 
-    // 1. Panggil Flask untuk face recognition
-    let flaskResponse
+    // 1. Panggil Flask
+    let flaskResponse;
     try {
       flaskResponse = await fetch(FLASK_ATTENDANCE_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: imageData }),
-      })
+      });
     } catch (e: any) {
-      console.error("Error calling Flask attendance API:", e.message)
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Gagal menghubungi layanan pengenalan wajah.",
-          errorDetail: e.message,
-        },
-        { status: 503 },
-      )
+      console.error("Gagal menghubungi Flask:", e.message);
+      return NextResponse.json({ success: false, message: 'Gagal menghubungi layanan pengenalan wajah.', errorDetail: e.message }, { status: 503 });
     }
 
-    const flaskData = await flaskResponse.json()
-
+    const flaskData = await flaskResponse.json();
     if (!flaskResponse.ok || !flaskData.nip) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: flaskData.message || flaskData.error || "Wajah tidak dikenali oleh server AI.",
-        },
-        { status: flaskResponse.status === 200 ? 404 : flaskResponse.status },
-      )
+      return NextResponse.json({ success: false, message: flaskData.message || flaskData.error || 'Wajah tidak dikenali.' }, { status: flaskResponse.status === 200 ? 404 : flaskResponse.status });
     }
 
-    const { nip, name: recognizedName } = flaskData
+    const { nip } = flaskData;
 
-    // 2. Cari karyawan di DB berdasarkan NIP dari Flask
+    // 2. Cari karyawan
     const karyawan = await prisma.karyawan.findUnique({
       where: { nip: String(nip) },
-    })
+    });
 
     if (!karyawan) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: `Karyawan dengan NIP ${nip} tidak ditemukan di database.`,
-        },
-        { status: 404 },
-      )
+      return NextResponse.json({ success: false, message: `Karyawan dengan NIP ${nip} tidak ditemukan.` }, { status: 404 });
     }
 
-    // 3. Ambil pengaturan absensi untuk menentukan status
-    const pengaturanAbsensi = await prisma.pengaturanAbsensi.findFirst({
-      orderBy: { id: "desc" },
-    })
-
-    if (!pengaturanAbsensi) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Pengaturan absensi belum dikonfigurasi.",
-        },
-        { status: 400 },
-      )
+    // 3. Ambil pengaturan absensi
+    const pengaturan = await prisma.pengaturanAbsensi.findFirst();
+    if (!pengaturan) {
+      return NextResponse.json({ success: false, message: 'Pengaturan absensi tidak ditemukan.' }, { status: 500 });
     }
 
-    // 4. Cek apakah hari ini adalah hari kerja
-    const today = new Date()
-    const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
-    const todayDayName = dayNames[today.getDay()]
+    // 4. Cek apakah hari ini termasuk hari kerja
+    const now = new Date();
+    const hariInggris = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const hariIni = hariInggris[now.getDay()];
 
-    if (!pengaturanAbsensi.hariKerja.includes(todayDayName)) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Hari ini bukan hari kerja.",
-        },
-        { status: 400 },
-      )
+    if (!pengaturan.hariKerja.includes(hariIni)) {
+      return NextResponse.json({ success: false, message: `Hari ${hariIni} bukan hari kerja.` }, { status: 403 });
     }
 
-    // 5. Cek apakah masih dalam jam absensi
-    const now = new Date()
-    const currentTime = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`
+    // 5. Cek apakah sudah absen hari ini
+    const awalHari = new Date(now);
+    awalHari.setHours(0, 0, 0, 0);
+    const akhirHari = new Date(now);
+    akhirHari.setHours(23, 59, 59, 999);
 
-    if (currentTime < pengaturanAbsensi.waktuMulaiAbsen) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: `Belum waktunya absen. Jam absensi dimulai pada ${pengaturanAbsensi.waktuMulaiAbsen}.`,
-        },
-        { status: 400 },
-      )
-    }
-
-    if (currentTime > pengaturanAbsensi.batasTerlambat) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: `Waktu absensi sudah berakhir. Batas akhir absensi adalah ${pengaturanAbsensi.batasTerlambat}.`,
-        },
-        { status: 400 },
-      )
-    }
-
-    // 6. Cek apakah sudah absen hari ini
-    const todayStart = new Date()
-    todayStart.setHours(0, 0, 0, 0)
-    const todayEnd = new Date()
-    todayEnd.setHours(23, 59, 59, 999)
-
-    const existingAttendance = await prisma.catatanAbsensi.findFirst({
+    const absensiHariIni = await prisma.catatanAbsensi.findFirst({
       where: {
         karyawanId: karyawan.id,
         timestamp_absensi: {
-          gte: todayStart,
-          lte: todayEnd,
+          gte: awalHari,
+          lte: akhirHari,
         },
       },
-    })
+    });
 
-    if (existingAttendance) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: `${karyawan.nama} sudah melakukan absensi hari ini pada ${existingAttendance.timestamp_absensi.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}.`,
-        },
-        { status: 409 },
-      )
+    if (absensiHariIni) {
+      return NextResponse.json({ success: false, message: 'Karyawan sudah melakukan absensi hari ini.' }, { status: 403 });
     }
 
-    // 7. Tentukan status absensi berdasarkan waktu
-    const timeToMinutes = (time: string) => {
-      const [jam, menit] = time.split(":").map(Number)
-      return jam * 60 + menit
+    // 6. Hitung status absensi berdasarkan waktu
+    const formatJam = (jamStr: string) => {
+      const [h, m] = jamStr.split(':').map(Number);
+      const d = new Date(now);
+      d.setHours(h, m, 0, 0);
+      return d;
+    };
+
+    const waktuMulai = formatJam(pengaturan.waktuMulaiAbsen);
+    const batasTepat = formatJam(pengaturan.batasTepatWaktu);
+    const batasTerlambat = formatJam(pengaturan.batasTerlambat);
+
+    let statusAbsensi: string;
+
+    if (now >= waktuMulai && now <= batasTepat) {
+      statusAbsensi = 'tepat waktu';
+    } else if (now > batasTepat && now <= batasTerlambat) {
+      statusAbsensi = 'terlambat';
+    } else {
+      return NextResponse.json({ success: false, message: 'Waktu absensi di luar rentang yang diizinkan.' }, { status: 403 });
     }
 
-    const currentMinutes = timeToMinutes(currentTime)
-    const batasTepatMinutes = timeToMinutes(pengaturanAbsensi.batasTepatWaktu)
-    const batasTerlambatMinutes = timeToMinutes(pengaturanAbsensi.batasTerlambat)
-
-    let statusAbsensi = "Hadir"
-    let statusDisplay = "hadir"
-
-    if (currentMinutes > batasTepatMinutes && currentMinutes <= batasTerlambatMinutes) {
-      statusAbsensi = "Terlambat"
-      statusDisplay = "terlambat"
-    }
-
-    // 8. Catat absensi ke database
-    const timestampAbsensi = new Date()
+    // 7. Catat absensi
     const newAttendanceRecord = await prisma.catatanAbsensi.create({
       data: {
         karyawanId: karyawan.id,
-        timestamp_absensi: timestampAbsensi,
+        timestamp_absensi: now,
         status: statusAbsensi,
       },
-    })
+    });
 
     const responsePayload: AttendanceResponse = {
       success: true,
-      message: `Absensi untuk ${karyawan.nama} berhasil dicatat! Status: ${statusAbsensi}`,
+      message: `Absensi ${statusAbsensi} untuk ${karyawan.nama} berhasil dicatat!`,
       nama: karyawan.nama,
       nip: karyawan.nip,
-      timestamp: timestampAbsensi.toISOString(),
-      status: statusDisplay,
+      timestamp: now.toISOString(),
+      status: statusAbsensi,
       catatanId: newAttendanceRecord.id,
-    }
+    };
 
-    console.log("Next.js API (/api/absensi/tandai) mengirim ke frontend:", responsePayload)
-    return NextResponse.json(responsePayload, { status: 200 })
+    console.log("Absensi berhasil dicatat:", responsePayload);
+
+    return NextResponse.json(responsePayload, { status: 200 });
+
   } catch (error: any) {
-    console.error("Error di API /api/absensi/tandai:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Terjadi kesalahan pada server Next.js saat absensi.",
-        errorDetail: error.message,
-      },
-      { status: 500 },
-    )
+    console.error("Error di API /api/absensi/tandai:", error);
+    return NextResponse.json({ success: false, message: 'Terjadi kesalahan pada server.', errorDetail: error.message }, { status: 500 });
   }
 }

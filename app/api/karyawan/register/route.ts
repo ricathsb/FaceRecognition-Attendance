@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import fs from "fs/promises"
 import path from "path"
+import bcrypt from "bcrypt"
 
 const FLASK_REGISTER_FACE_URL = process.env.FLASK_BACKEND_URL
   ? `${process.env.FLASK_BACKEND_URL}/register-face`
@@ -22,9 +23,6 @@ export async function POST(request: NextRequest) {
     const email = body.email?.toString().trim() || ""
     const password = body.password?.toString().trim() || ""
     const fotoWajah = body.fotoWajah || ""
-
-    console.log("=== REGISTRATION DEBUG ===")
-    console.log("Extracted data:", { nama, nip, email, passwordLength: password.length, fotoWajah: !!fotoWajah })
 
     if (!nama || !nip || !email || !password || !fotoWajah) {
       const missingFields = { nama: !nama, nip: !nip, email: !email, password: !password, fotoWajah: !fotoWajah }
@@ -53,10 +51,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: `Email ${email} sudah terdaftar.` }, { status: 409 })
     }
 
-    // === Call Flask API first ===
-    console.log(`🤖 Calling Flask at ${FLASK_REGISTER_FACE_URL} for NIP: ${nip}`)
+    // === Call Flask API ===
     let flaskData
-
     try {
       const flaskResponse = await fetch(FLASK_REGISTER_FACE_URL, {
         method: "POST",
@@ -67,29 +63,19 @@ export async function POST(request: NextRequest) {
       flaskData = await flaskResponse.json()
 
       if (!flaskResponse.ok) {
-        console.error(`❌ Flask error:`, flaskData)
-        return NextResponse.json(
-          {
-            message: `Gagal memproses encoding wajah di server AI (Error: ${flaskData.message || flaskData.error || "Tidak ada detail error dari server AI"}). Data karyawan tidak disimpan.`,
-            success: false,
-          },
-          { status: 502 },
-        )
-      }
-
-      console.log("✅ Flask encoding success:", flaskData)
-    } catch (flaskCallError: any) {
-      console.error("❌ Failed to call Flask:", flaskCallError)
-      return NextResponse.json(
-        {
-          message: `Gagal menghubungi server AI untuk proses encoding wajah (${flaskCallError.message}). Data karyawan tidak disimpan.`,
+        return NextResponse.json({
+          message: `Gagal memproses encoding wajah di server AI (Error: ${flaskData.message || flaskData.error || "Tidak ada detail error"}).`,
           success: false,
-        },
-        { status: 502 },
-      )
+        }, { status: 502 })
+      }
+    } catch (flaskCallError: any) {
+      return NextResponse.json({
+        message: `Gagal menghubungi server AI untuk proses encoding wajah (${flaskCallError.message}).`,
+        success: false,
+      }, { status: 502 })
     }
 
-    // === Save image to disk ===
+    // === Save Image to Disk ===
     const base64Data = fotoWajah.replace(/^data:image\/\w+;base64,/, "")
     const buffer = Buffer.from(base64Data, "base64")
     const timestamp = Date.now()
@@ -97,7 +83,6 @@ export async function POST(request: NextRequest) {
     const mimeTypeMatch = fotoWajah.match(/^data:(image\/\w+);base64,/)
     let extension = ".jpeg"
     if (mimeTypeMatch?.[1] === "image/png") extension = ".png"
-    else if (mimeTypeMatch?.[1] === "image/jpeg") extension = ".jpeg"
 
     const sanitizedNip = sanitizeFilenameFromString(nip)
     const fotoFilename = `${sanitizedNip}_${timestamp}${extension}`
@@ -105,40 +90,38 @@ export async function POST(request: NextRequest) {
 
     await fs.mkdir(uploadDir, { recursive: true })
     const filePath = path.join(uploadDir, fotoFilename)
-    await fs.writeFile(filePath, new Uint8Array(buffer))
+    await fs.writeFile(filePath, buffer)
 
     const fotoDbPath = `/uploads/karyawan_photos/${fotoFilename}`
-    console.log("✅ Image saved to:", fotoDbPath)
-
     const encodedFaceString = JSON.stringify(flaskData.face_encoding)
+
+    const hashedPassword = await bcrypt.hash(password, 10)
+
     const karyawanData = await prisma.karyawan.create({
       data: {
         nama,
         nip,
         email,
-        password, // NOTE: plaintext - disarankan untuk di-hash
+        password: hashedPassword,
         foto_filename: fotoDbPath,
-        face_embedding: encodedFaceString
+        face_embedding: encodedFaceString,
       },
     })
 
-    return NextResponse.json(
-      {
-        message: flaskData.message || `Pendaftaran berhasil dan encoding wajah sukses.`,
-        success: true,
-        karyawan: {
-          id: karyawanData.id,
-          nama,
-          nip,
-          email,
-          foto_filename: fotoDbPath,
-          createdAt: karyawanData.createdAt,
-        },
+    return NextResponse.json({
+      message: flaskData.message || `Pendaftaran berhasil dan encoding wajah sukses.`,
+      success: true,
+      karyawan: {
+        id: karyawanData.id,
+        nama,
+        nip,
+        email,
+        foto_filename: fotoDbPath,
+        createdAt: karyawanData.createdAt,
       },
-      { status: 201 },
-    )
+    }, { status: 201 })
   } catch (error: any) {
-    console.error("❌ Unhandled error in registration:", error)
+    console.error("❌ Unhandled error:", error)
 
     if (error.code === "P2002") {
       if (error.meta?.target?.includes("nip")) {
@@ -149,13 +132,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(
-      {
-        message: "Terjadi kesalahan pada server.",
-        errorDetail: error.message || error.toString(),
-        success: false,
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({
+      message: "Terjadi kesalahan pada server.",
+      errorDetail: error.message || error.toString(),
+      success: false,
+    }, { status: 500 })
   }
 }
