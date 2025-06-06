@@ -1,10 +1,11 @@
-// app/api/karyawan/management/route.ts
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import dayjs from "dayjs"
 import "dayjs/locale/id"
 
 dayjs.locale("id")
+
+export const dynamic = "force-dynamic"
 
 export async function GET() {
   try {
@@ -47,34 +48,39 @@ export async function GET() {
     for (const absenData of semuaAbsensiHariIni) {
       const jam = dayjs(absenData.timestamp_absensi)
       const nama = absenData.karyawan.nama
-      const status = absenData.status.toLowerCase()
+      const statusDb = absenData.status.toLowerCase()
       const id = absenData.id
 
       if (!hadirSet.has(absenData.karyawanId)) {
-      hadirSet.add(absenData.karyawanId)
-      hadir++
+        hadirSet.add(absenData.karyawanId)
 
-      let kategori = "hadir"
+        let kategori = "hadir"
 
-      if (jam.isAfter(batasTepat) && jam.isBefore(batasTelat)) {
-        kategori = "terlambat"
-        telat++
-      } else if (jam.isAfter(batasTelat)) {
-        kategori = "tidak"
+        // Tentukan kategori berdasarkan status dari database atau waktu
+        if (statusDb === "terlambat" || (jam.isAfter(batasTepat) && jam.isBefore(batasTelat))) {
+          kategori = "terlambat"
+          telat++
+        } else if (statusDb === "tidak hadir" || statusDb === "tidak" || jam.isAfter(batasTelat)) {
+          kategori = "tidak"
+          absen++
+        } else {
+          kategori = "hadir"
+          hadir++
+        }
+
+        aktivitasTerbaru.push({
+          id,
+          name: nama,
+          action: `Check-in pada ${jam.format("HH:mm")}`,
+          time: jam.format("HH:mm"),
+          status: kategori,
+        })
       }
-
-      aktivitasTerbaru.push({
-        id,
-        name: nama,
-        action: `Check-in pada ${jam.format("HH:mm")}`,
-        time: jam.format("HH:mm"),
-        status: kategori,
-      })
     }
 
-    }
-
-    absen = totalKaryawan - hadir
+    // Hitung yang belum absen
+    const belumAbsen = totalKaryawan - hadirSet.size
+    absen += belumAbsen
 
     return NextResponse.json({
       totalKaryawan,
