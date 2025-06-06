@@ -44,48 +44,24 @@ export async function GET() {
     let absen = 0
     const aktivitasTerbaru: any[] = []
 
-    const toMinutes = (timeStr: string) => {
-      const [h, m] = timeStr.split(":").map(Number)
-      return h * 60 + m
-    }
-
-    const waktuMulai = toMinutes(pengaturan.waktuMulaiAbsen)
-    const batasTepat = toMinutes(pengaturan.batasTepatWaktu)
-    const batasTerlambat = toMinutes(pengaturan.batasTerlambat)
-
     for (const absenData of semuaAbsensiHariIni) {
-      const jam = dayjs(absenData.timestamp_absensi).tz("Asia/Jakarta")
-      const nama = absenData.karyawan.nama
-      const id = absenData.id
-      const karyawanId = absenData.karyawanId
+      const { id, karyawan, karyawanId, timestamp_absensi, status } = absenData
 
       if (!hadirSet.has(karyawanId)) {
         hadirSet.add(karyawanId)
+        hadir++
 
-        const jamAbsenStr = jam.format("HH:mm")
-        const menitAbsen = toMinutes(jamAbsenStr)
-        const selisih = menitAbsen - waktuMulai
-
-        let status: "ontime" | "late" | "absent" = "absent"
-
-        if (selisih <= batasTepat) {
-          status = "ontime"
-          hadir++
-        } else if (selisih <= batasTerlambat) {
-          status = "late"
-          hadir++
+        if (status === "terlambat") {
           telat++
         }
 
-        if (status !== "absent") {
-          aktivitasTerbaru.push({
-            id,
-            name: nama,
-            action: `Check-in pada ${jam.format("HH:mm")}`,
-            time: jam.format("HH:mm"),
-            status,
-          })
-        }
+        aktivitasTerbaru.push({
+          id,
+          name: karyawan.nama,
+          action: `Check-in pada ${dayjs(timestamp_absensi).tz("Asia/Jakarta").format("HH:mm")}`,
+          time: dayjs(timestamp_absensi).tz("Asia/Jakarta").format("HH:mm"),
+          status: status === "terlambat" ? "late" : "ontime",
+        })
       }
     }
 

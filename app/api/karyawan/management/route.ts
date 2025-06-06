@@ -36,15 +36,6 @@ export async function GET() {
       )
     }
 
-    const timeToMinutes = (time: string) => {
-      const [jam, menit] = time.split(":").map(Number)
-      return jam * 60 + menit
-    }
-
-    const waktuMulaiMenit = timeToMinutes(pengaturanAbsensi.waktuMulaiAbsen)
-    const batasTepatMenit = timeToMinutes(pengaturanAbsensi.batasTepatWaktu)
-    const batasTerlambatMenit = timeToMinutes(pengaturanAbsensi.batasTerlambat)
-
     const now = dayjs().tz("Asia/Jakarta")
     const selectedYear = now.year()
     const selectedMonth = now.month() // 0-based index
@@ -64,34 +55,17 @@ export async function GET() {
       karyawan.catatanAbsensi.forEach((absen) => {
         const timestampWIB = dayjs(absen.timestamp_absensi).tz("Asia/Jakarta")
         const tanggal = timestampWIB.format("YYYY-MM-DD")
-        const jamAbsen = timestampWIB.format("HH:mm")
-        const absenMenit = timeToMinutes(jamAbsen)
-
         const today = now.format("YYYY-MM-DD")
+
         if (tanggal > today) return
 
-        let status = "tidak hadir"
-
-        if (
-          absen.status.toLowerCase() === "hadir" ||
-          absen.status.toLowerCase() === "masuk"
-        ) {
-          const selisihMenit = absenMenit - waktuMulaiMenit
-          if (selisihMenit <= batasTepatMenit) {
-            status = "hadir"
-          } else if (selisihMenit <= batasTerlambatMenit) {
-            status = "terlambat"
-          } else {
-            status = "tidak hadir"
-          }
-        }
+        const status = absen.status.toLowerCase()
 
         if (!(tanggal in attendance)) {
           attendance[tanggal] = status
         }
       })
 
-      // Hitung ringkasan hadir(terlambat)/hari kerja
       let hadirCount = 0
       let terlambatCount = 0
       let totalWorkDays = 0
@@ -106,12 +80,17 @@ export async function GET() {
         totalWorkDays++
 
         if (!attendance[tanggalStr] && date.isBefore(now, "day")) {
-          attendance[tanggalStr] = "Absen"
+          attendance[tanggalStr] = "absen"
         }
 
         const status = attendance[tanggalStr]
-        if (status === "hadir") hadirCount++
-        else if (status === "terlambat") terlambatCount++
+
+        if (status === "tepat waktu") {
+          hadirCount++
+        } else if (status === "terlambat") {
+          hadirCount++
+          terlambatCount++
+        }
       }
 
       const summary = `${hadirCount}(${terlambatCount})/${totalWorkDays}`
@@ -141,6 +120,7 @@ export async function GET() {
     )
   }
 }
+
 
 export async function PUT(req: Request) {
   try {

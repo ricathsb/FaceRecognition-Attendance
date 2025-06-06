@@ -7,6 +7,7 @@ import numpy as np
 import os
 import re
 import face_recognition
+import bcrypt
 # import pickle # Tidak diperlukan lagi jika encoding disimpan di DB
 
 # Impor untuk koneksi database (contoh dengan psycopg2)
@@ -187,7 +188,6 @@ def login():
     if email == 'admin@example.com' and password == 'admin123':
         return jsonify({"message": "Login berhasil", "role": "admin"}), 200
 
-    # Login karyawan dari database
     conn = get_db_connection()
     if conn is None:
         return jsonify({"error": "Tidak bisa konek ke database"}), 503
@@ -195,18 +195,25 @@ def login():
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            SELECT nama FROM public."Karyawan"
-            WHERE email = %s AND password = %s
-        """, (email, password))
-        karyawan = cursor.fetchone()
-        if karyawan:
-            return jsonify({
-                "message": "Login berhasil",
-                "role": "user",
-                "nama": karyawan[0]
-            }), 200
+            SELECT nama, password FROM public."Karyawan"
+            WHERE email = %s
+        """, (email,))
+        row = cursor.fetchone()
+
+        if row:
+            nama, hashed_password = row
+
+            if bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8')):
+                return jsonify({
+                    "message": "Login berhasil",
+                    "role": "user",
+                    "nama": nama
+                }), 200
+            else:
+                return jsonify({"message": "Email atau password salah"}), 401
         else:
             return jsonify({"message": "Email atau password salah"}), 401
+
     except psycopg2.Error as db_err:
         return jsonify({"error": f"Database error: {str(db_err)}"}), 500
     finally:

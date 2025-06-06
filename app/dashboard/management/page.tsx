@@ -11,7 +11,7 @@ type Employee = {
   attendance: {
     [tanggal: string]: string
   }
-  summary: string // <--- tambahkan ini untuk data "12(3)/31"
+  summary: string
 }
 
 
@@ -89,30 +89,34 @@ export default function ManagementPage() {
     return month ? month.label : "Januari"
   }
 
-  const getAttendanceColor = (status: string) => {
-    switch (status) {
-      case "hadir":
-        return "bg-green-500"
-      case "terlambat":
-        return "bg-yellow-500"
-      case "Absen":
-        return "bg-red-500"
-
-    }
+ const getAttendanceColor = (status: string) => {
+  switch (status) {
+    case "hadir":
+    case "tepat waktu": 
+      return "bg-green-500"
+    case "terlambat":
+      return "bg-yellow-500"
+    case "absen":
+      return "bg-red-500"
+    default:
+      return "bg-gray-300" 
   }
+}
 
-  const getAttendanceText = (status: string) => {
-    switch (status) {
-      case "hadir":
-        return "H"
-      case "terlambat":
-        return "T"
-      case "Absen":
-        return "A" 
-      default :
-        return 
-    }
+const getAttendanceText = (status: string) => {
+  switch (status) {
+    case "hadir":
+    case "tepat waktu":
+      return "H"
+    case "terlambat":
+      return "T"
+    case "absen":
+      return "A"
+    default:
+      return "?"
   }
+}
+
 
   const handleWorkDayToggle = (day: string) => {
     setAttendanceSettings((prev) => ({
@@ -194,11 +198,9 @@ useEffect(() => {
       const res = await fetch("/api/karyawan/management")
       const data = await res.json()
 
-      // Ambil tanggal hari ini
       const now = new Date()
-      const today = now.getDate()
-      const currentMonth = now.getMonth() + 1
-      const currentYear = now.getFullYear()
+      const todayStr = now.toISOString().split("T")[0] // "2025-06-06"
+      const todayDateOnly = new Date(todayStr) // jam 00:00
 
       const selectedMonthInt = parseInt(selectedMonth)
       const selectedYearInt = parseInt(selectedYear)
@@ -221,32 +223,27 @@ useEffect(() => {
         const filledData = data.employees.map((employee: Employee) => {
           const newAttendance = { ...employee.attendance }
 
-          for (let day = 1; day < today; day++) {
+          for (let day = 1; day <= daysInMonth; day++) {
             const date = new Date(selectedYearInt, selectedMonthInt - 1, day)
             const dayOfWeek = weekdayMap[date.getDay()]
             const dayStr = day.toString().padStart(2, "0")
-            const dateStr = `${selectedYear}-${selectedMonth}-${dayStr}`
+            const monthStr = selectedMonth.padStart(2, "0")
+            const dateStr = `${selectedYear}-${monthStr}-${dayStr}`
 
-            const isPast =
-              selectedYearInt < currentYear ||
-              (selectedYearInt === currentYear &&
-                (selectedMonthInt < currentMonth ||
-                  (selectedMonthInt === currentMonth && day < today)))
-
+            const isBeforeToday = date < todayDateOnly
             const isWorkDay = workDaysSetting.includes(dayOfWeek)
 
-            if (isPast && isWorkDay && !newAttendance[dateStr]) {
-              newAttendance[dateStr] = "Absen"
+            if (isBeforeToday && isWorkDay && !newAttendance[dateStr]) {
+              newAttendance[dateStr] = "absen"
             }
           }
 
-          // Jika backend sudah hitung dan kirim summary:
           const summary = employee.summary ?? "0(0)/0"
 
           return {
             ...employee,
             attendance: newAttendance,
-            summary, // simpan ke state juga
+            summary,
           }
         })
 
