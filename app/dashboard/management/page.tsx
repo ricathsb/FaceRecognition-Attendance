@@ -11,7 +11,9 @@ type Employee = {
   attendance: {
     [tanggal: string]: string
   }
+  summary: string // <--- tambahkan ini untuk data "12(3)/31"
 }
+
 
 type AttendanceSettings = {
   checkInStartTime: string
@@ -93,10 +95,9 @@ export default function ManagementPage() {
         return "bg-green-500"
       case "terlambat":
         return "bg-yellow-500"
-      case "tidak":
+      case "Absen":
         return "bg-red-500"
-      default:
-        return "bg-gray-400"
+
     }
   }
 
@@ -106,10 +107,10 @@ export default function ManagementPage() {
         return "H"
       case "terlambat":
         return "T"
-      case "tidak":
-        return "-"
-      default:
-        return "-"
+      case "Absen":
+        return "A" 
+      default :
+        return 
     }
   }
 
@@ -187,31 +188,80 @@ export default function ManagementPage() {
     }
   }
 // Cek otentikasi pengguna
-  useEffect(() => {
-    const fetchEmployeesAndSettings = async () => {
-      try {
-        const res = await fetch("/api/karyawan/management")
-        const data = await res.json()
+useEffect(() => {
+  const fetchEmployeesAndSettings = async () => {
+    try {
+      const res = await fetch("/api/karyawan/management")
+      const data = await res.json()
 
-        if (Array.isArray(data.employees)) {
-          setEmployeeData(data.employees)
-        }
+      // Ambil tanggal hari ini
+      const now = new Date()
+      const today = now.getDate()
+      const currentMonth = now.getMonth() + 1
+      const currentYear = now.getFullYear()
 
-        if (data.attendanceSettings) {
-          setAttendanceSettings({
-            checkInStartTime: data.attendanceSettings.waktuMulaiAbsen ?? "07:00",
-            onTimeBeforeHour: data.attendanceSettings.batasTepatWaktu ?? "09:00",
-            lateBeforeHour: data.attendanceSettings.batasTerlambat ?? "14:00",
-            workDays: data.attendanceSettings.hariKerja ?? ["monday", "tuesday"],
-          })
-        }
-      } catch (error) {
-        console.error("Gagal memuat data karyawan dan pengaturan absensi:", error)
+      const selectedMonthInt = parseInt(selectedMonth)
+      const selectedYearInt = parseInt(selectedYear)
+      const daysInMonth = new Date(selectedYearInt, selectedMonthInt, 0).getDate()
+
+      const weekdayMap = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+
+      let workDaysSetting = ["monday", "tuesday", "wednesday", "thursday", "friday"]
+      if (data.attendanceSettings) {
+        workDaysSetting = data.attendanceSettings.hariKerja ?? workDaysSetting
+        setAttendanceSettings({
+          checkInStartTime: data.attendanceSettings.waktuMulaiAbsen ?? "07:00",
+          onTimeBeforeHour: data.attendanceSettings.batasTepatWaktu ?? "09:00",
+          lateBeforeHour: data.attendanceSettings.batasTerlambat ?? "14:00",
+          workDays: workDaysSetting,
+        })
       }
-    }
 
-    fetchEmployeesAndSettings()
-  }, [])
+      if (Array.isArray(data.employees)) {
+        const filledData = data.employees.map((employee: Employee) => {
+          const newAttendance = { ...employee.attendance }
+
+          for (let day = 1; day < today; day++) {
+            const date = new Date(selectedYearInt, selectedMonthInt - 1, day)
+            const dayOfWeek = weekdayMap[date.getDay()]
+            const dayStr = day.toString().padStart(2, "0")
+            const dateStr = `${selectedYear}-${selectedMonth}-${dayStr}`
+
+            const isPast =
+              selectedYearInt < currentYear ||
+              (selectedYearInt === currentYear &&
+                (selectedMonthInt < currentMonth ||
+                  (selectedMonthInt === currentMonth && day < today)))
+
+            const isWorkDay = workDaysSetting.includes(dayOfWeek)
+
+            if (isPast && isWorkDay && !newAttendance[dateStr]) {
+              newAttendance[dateStr] = "Absen"
+            }
+          }
+
+          // Jika backend sudah hitung dan kirim summary:
+          const summary = employee.summary ?? "0(0)/0"
+
+          return {
+            ...employee,
+            attendance: newAttendance,
+            summary, // simpan ke state juga
+          }
+        })
+
+        setEmployeeData(filledData)
+      }
+
+    } catch (error) {
+      console.error("Gagal memuat data karyawan dan pengaturan absensi:", error)
+    }
+  }
+
+  fetchEmployeesAndSettings()
+}, [selectedMonth, selectedYear])
+
+
 
   useEffect(() => {
     const availableMonths = getAvailableMonths()
@@ -439,6 +489,34 @@ export default function ManagementPage() {
                     </tr>
                   ))}
                 </tbody>
+              </table>
+            </div>
+            {/* summary */}
+            <div className="flex-shrink-0">
+              <table className="border-collapse">
+                <thead>
+                  <tr>
+                    <th className="h-12 w-24 bg-emerald-100 dark:bg-emerald-900/30 px-4 text-center text-sm font-semibold text-gray-900 dark:text-white border-b">
+                      Total
+                    </th>
+                  </tr>
+                  <tr>
+                    <th className="h-10 w-24 bg-emerald-50 dark:bg-emerald-900/20 text-center text-xs font-medium text-gray-700 dark:text-gray-300 border-b">
+                      &nbsp;
+                    </th>
+                  </tr>
+                </thead>
+               <tbody>
+                {filteredEmployees.map((emp) => (
+                  <tr key={emp.id} className="hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-colors">
+                    <td className="h-16 w-24 px-3 text-center border-b">
+                      <div className="flex items-center justify-center font-mono text-sm text-gray-700 dark:text-gray-200">
+                        {emp.summary}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
               </table>
             </div>
 

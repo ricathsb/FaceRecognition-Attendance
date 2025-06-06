@@ -1,14 +1,17 @@
-// app/api/karyawan/management/route.ts
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import dayjs from "dayjs"
 import "dayjs/locale/id"
+import utc from "dayjs/plugin/utc"
+import timezone from "dayjs/plugin/timezone"
 
+dayjs.extend(utc)
+dayjs.extend(timezone)
 dayjs.locale("id")
 
 export async function GET() {
   try {
-    const now = dayjs()
+    const now = dayjs().tz("Asia/Jakarta")
     const todayStart = now.startOf("day").toDate()
     const todayEnd = now.endOf("day").toDate()
 
@@ -41,37 +44,49 @@ export async function GET() {
     let absen = 0
     const aktivitasTerbaru: any[] = []
 
-    const batasTepat = dayjs(`${now.format("YYYY-MM-DD")}T${pengaturan.batasTepatWaktu}`)
-    const batasTelat = dayjs(`${now.format("YYYY-MM-DD")}T${pengaturan.batasTerlambat}`)
-
-    for (const absenData of semuaAbsensiHariIni) {
-      const jam = dayjs(absenData.timestamp_absensi)
-      const nama = absenData.karyawan.nama
-      const status = absenData.status.toLowerCase()
-      const id = absenData.id
-
-      if (!hadirSet.has(absenData.karyawanId)) {
-      hadirSet.add(absenData.karyawanId)
-      hadir++
-
-      let kategori = "hadir"
-
-      if (jam.isAfter(batasTepat) && jam.isBefore(batasTelat)) {
-        kategori = "terlambat"
-        telat++
-      } else if (jam.isAfter(batasTelat)) {
-        kategori = "tidak"
-      }
-
-      aktivitasTerbaru.push({
-        id,
-        name: nama,
-        action: `Check-in pada ${jam.format("HH:mm")}`,
-        time: jam.format("HH:mm"),
-        status: kategori,
-      })
+    const toMinutes = (timeStr: string) => {
+      const [h, m] = timeStr.split(":").map(Number)
+      return h * 60 + m
     }
 
+    const waktuMulai = toMinutes(pengaturan.waktuMulaiAbsen)
+    const batasTepat = toMinutes(pengaturan.batasTepatWaktu)
+    const batasTerlambat = toMinutes(pengaturan.batasTerlambat)
+
+    for (const absenData of semuaAbsensiHariIni) {
+      const jam = dayjs(absenData.timestamp_absensi).tz("Asia/Jakarta")
+      const nama = absenData.karyawan.nama
+      const id = absenData.id
+      const karyawanId = absenData.karyawanId
+
+      if (!hadirSet.has(karyawanId)) {
+        hadirSet.add(karyawanId)
+
+        const jamAbsenStr = jam.format("HH:mm")
+        const menitAbsen = toMinutes(jamAbsenStr)
+        const selisih = menitAbsen - waktuMulai
+
+        let status: "ontime" | "late" | "absent" = "absent"
+
+        if (selisih <= batasTepat) {
+          status = "ontime"
+          hadir++
+        } else if (selisih <= batasTerlambat) {
+          status = "late"
+          hadir++
+          telat++
+        }
+
+        if (status !== "absent") {
+          aktivitasTerbaru.push({
+            id,
+            name: nama,
+            action: `Check-in pada ${jam.format("HH:mm")}`,
+            time: jam.format("HH:mm"),
+            status,
+          })
+        }
+      }
     }
 
     absen = totalKaryawan - hadir
