@@ -198,6 +198,9 @@ useEffect(() => {
       const res = await fetch("/api/karyawan/management")
       const data = await res.json()
 
+       console.log("📦 Data API:", data) // ⬅️ Tambahkan ini agar bisa dicek di console
+
+
       const now = new Date()
       const todayStr = now.toISOString().split("T")[0] // "2025-06-06"
       const todayDateOnly = new Date(todayStr) // jam 00:00
