@@ -1,8 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Search, Save, X, Clock, Trash2, AlertCircle } from "lucide-react"
+import { useEffect, useState, useRef } from "react"
+import { Search, Save, X, Clock, Trash2, AlertCircle, Info, ChevronLeft, ChevronRight } from "lucide-react"
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import MonthSelector from "@/components/month-selector"
 
 type Employee = {
   id: string
@@ -12,8 +13,13 @@ type Employee = {
     [tanggal: string]: string
   }
   summary: string
+  stats?: {
+    hadir: number
+    terlambat: number
+    absen: number
+    totalWorkDays: number
+  }
 }
-
 
 type AttendanceSettings = {
   checkInStartTime: string
@@ -28,13 +34,18 @@ export default function ManagementPage() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString())
   const [employeeData, setEmployeeData] = useState<Employee[]>([])
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
+  const [isLoading, setIsLoading] = useState(true)
   const [attendanceSettings, setAttendanceSettings] = useState<AttendanceSettings>({
     checkInStartTime: "07:00",
     onTimeBeforeHour: "09:00",
     lateBeforeHour: "14:00",
-    workDays: ["monday", "tuesday", "wednesday", "thursday", "friday"],
+    workDays: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"],
   })
+
+  // Refs untuk scrolling
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const [showLeftScroll, setShowLeftScroll] = useState(false)
+  const [showRightScroll, setShowRightScroll] = useState(true)
 
   const allMonths = [
     { value: "01", label: "Januari" },
@@ -61,62 +72,38 @@ export default function ManagementPage() {
     { value: "sunday", label: "Minggu" },
   ]
 
-  const getAvailableMonths = () => {
-    const currentYear = new Date().getFullYear()
-    const currentMonth = new Date().getMonth() + 1
-
-    if (Number.parseInt(selectedYear) === currentYear) {
-      return allMonths.filter((month) => Number.parseInt(month.value) <= currentMonth)
-    } else if (Number.parseInt(selectedYear) < currentYear) {
-      return allMonths
-    } else {
-      return allMonths
-    }
-  }
-
-  const generateYearOptions = () => {
-    const currentYear = new Date().getFullYear()
-    const startYear = 2025
-    const years = []
-    for (let year = startYear; year <= currentYear + 5; year++) {
-      years.push(year.toString())
-    }
-    return years
-  }
-
   const getSelectedMonthName = () => {
     const month = allMonths.find((m) => m.value === selectedMonth)
     return month ? month.label : "Januari"
   }
 
- const getAttendanceColor = (status: string) => {
-  switch (status) {
-    case "hadir":
-    case "tepat waktu": 
-      return "bg-green-500"
-    case "terlambat":
-      return "bg-yellow-500"
-    case "absen":
-      return "bg-red-500"
-    default:
-      return "bg-gray-300" 
+  const getAttendanceColor = (status: string) => {
+    switch (status) {
+      case "hadir":``
+      case "tepat waktu":
+        return "bg-green-500"
+      case "terlambat":
+        return "bg-yellow-500"
+      case "absen":
+        return "bg-red-500"
+      default:
+        return "bg-gray-300"
+    }
   }
-}
 
-const getAttendanceText = (status: string) => {
-  switch (status) {
-    case "hadir":
-    case "tepat waktu":
-      return "H"
-    case "terlambat":
-      return "T"
-    case "absen":
-      return "A"
-    default:
-      return "?"
+  const getAttendanceText = (status: string) => {
+    switch (status) {
+      case "hadir":
+      case "tepat waktu":
+        return "H"
+      case "terlambat":
+        return "T"
+      case "absen":
+        return "A"
+      default:
+        return "?"
+    }
   }
-}
-
 
   const handleWorkDayToggle = (day: string) => {
     setAttendanceSettings((prev) => ({
@@ -125,7 +112,6 @@ const getAttendanceText = (status: string) => {
     }))
   }
 
-//apus data
   const handleDeleteEmployee = async (employeeId: string, employeeName: string) => {
     if (
       confirm(
@@ -171,7 +157,6 @@ const getAttendanceText = (status: string) => {
     }
 
     try {
-      // API call nyimpan pengaturan absensi
       const response = await fetch("/api/karyawan/management", {
         method: "PUT",
         headers: {
@@ -183,6 +168,8 @@ const getAttendanceText = (status: string) => {
       if (response.ok) {
         setIsSettingsModalOpen(false)
         alert("Pengaturan absensi berhasil disimpan!")
+        // Refresh data after settings change
+        fetchEmployeesAndSettings()
       } else {
         alert("Gagal menyimpan pengaturan absensi")
       }
@@ -191,88 +178,49 @@ const getAttendanceText = (status: string) => {
       alert("Terjadi kesalahan saat menyimpan pengaturan")
     }
   }
-// Cek otentikasi pengguna
-useEffect(() => {
+
   const fetchEmployeesAndSettings = async () => {
+    setIsLoading(true)
     try {
-      const res = await fetch("/api/karyawan/management")
+      const res = await fetch(`/api/karyawan/management?month=${selectedMonth}&year=${selectedYear}`)
       const data = await res.json()
 
-       console.log("📦 Data API:", data) // ⬅️ Tambahkan ini agar bisa dicek di console
+      console.log(" Data API Management:", data)
 
-
-      const now = new Date()
-      const todayStr = now.toISOString().split("T")[0] // "2025-06-06"
-      const todayDateOnly = new Date(todayStr) // jam 00:00
-
-      const selectedMonthInt = parseInt(selectedMonth)
-      const selectedYearInt = parseInt(selectedYear)
-      const daysInMonth = new Date(selectedYearInt, selectedMonthInt, 0).getDate()
-
-      const weekdayMap = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
-
-      let workDaysSetting = ["monday", "tuesday", "wednesday", "thursday", "friday"]
       if (data.attendanceSettings) {
-        workDaysSetting = data.attendanceSettings.hariKerja ?? workDaysSetting
         setAttendanceSettings({
           checkInStartTime: data.attendanceSettings.waktuMulaiAbsen ?? "07:00",
           onTimeBeforeHour: data.attendanceSettings.batasTepatWaktu ?? "09:00",
           lateBeforeHour: data.attendanceSettings.batasTerlambat ?? "14:00",
-          workDays: workDaysSetting,
+          workDays: data.attendanceSettings.hariKerja ?? [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+          ],
         })
       }
 
       if (Array.isArray(data.employees)) {
-        const filledData = data.employees.map((employee: Employee) => {
-          const newAttendance = { ...employee.attendance }
-
-          for (let day = 1; day <= daysInMonth; day++) {
-            const date = new Date(selectedYearInt, selectedMonthInt - 1, day)
-            const dayOfWeek = weekdayMap[date.getDay()]
-            const dayStr = day.toString().padStart(2, "0")
-            const monthStr = selectedMonth.padStart(2, "0")
-            const dateStr = `${selectedYear}-${monthStr}-${dayStr}`
-
-            const isBeforeToday = date < todayDateOnly
-            const isWorkDay = workDaysSetting.includes(dayOfWeek)
-
-            if (isBeforeToday && isWorkDay && !newAttendance[dateStr]) {
-              newAttendance[dateStr] = "absen"
-            }
-          }
-
-          const summary = employee.summary ?? "0(0)/0"
-
-          return {
-            ...employee,
-            attendance: newAttendance,
-            summary,
-          }
-        })
-
-        setEmployeeData(filledData)
+        setEmployeeData(data.employees)
       }
-
     } catch (error) {
       console.error("Gagal memuat data karyawan dan pengaturan absensi:", error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  fetchEmployeesAndSettings()
-}, [selectedMonth, selectedYear])
-
-
-
   useEffect(() => {
-    const availableMonths = getAvailableMonths()
-    const isSelectedMonthAvailable = availableMonths.some((month) => month.value === selectedMonth)
+    fetchEmployeesAndSettings()
+  }, [selectedMonth, selectedYear])
 
-    if (!isSelectedMonthAvailable && availableMonths.length > 0) {
-      setSelectedMonth(availableMonths[availableMonths.length - 1].value)
-    }
-  }, [selectedYear, selectedMonth])
-
-  const getDaysInMonth = () => {
+  // Fungsi untuk mendapatkan jumlah hari dalam bulan yang benar
+  const getDaysInSelectedMonth = () => {
+    // Gunakan perhitungan yang benar untuk jumlah hari dalam bulan
     const lastDay = new Date(Number.parseInt(selectedYear), Number.parseInt(selectedMonth), 0).getDate()
     return Array.from({ length: lastDay }, (_, i) => i + 1)
   }
@@ -281,11 +229,55 @@ useEffect(() => {
     (employee) => employee.name.toLowerCase().includes(searchTerm.toLowerCase()) || employee.nip.includes(searchTerm),
   )
 
-  // Cek apakah sekarang dalam rentang waktu absen
   const isWithinCheckInTime = () => {
     const now = new Date()
     const currentTime = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`
     return currentTime >= attendanceSettings.checkInStartTime && currentTime <= attendanceSettings.lateBeforeHour
+  }
+
+  // Fungsi untuk scroll tabel
+  const handleScroll = () => {
+    if (scrollContainerRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current
+      setShowLeftScroll(scrollLeft > 0)
+      setShowRightScroll(scrollLeft < scrollWidth - clientWidth - 5) // 5px buffer
+    }
+  }
+
+  const scrollLeft = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: -200, behavior: "smooth" })
+    }
+  }
+
+  const scrollRight = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: 200, behavior: "smooth" })
+    }
+  }
+
+  // Tambahkan event listener untuk scroll
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current
+    if (scrollContainer) {
+      scrollContainer.addEventListener("scroll", handleScroll)
+      // Check initial scroll state
+      handleScroll()
+      return () => scrollContainer.removeEventListener("scroll", handleScroll)
+    }
+  }, [])
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-1 flex-col gap-4 p-4 pt-0 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-gray-900 dark:to-gray-800 min-h-screen">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">Memuat data...</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -362,6 +354,8 @@ useEffect(() => {
         </div>
       </div>
 
+
+
       {/* Search and Filter */}
       <div className="flex flex-col lg:flex-row gap-4 p-6 bg-white dark:bg-gray-800 rounded-xl border border-emerald-100 dark:border-gray-700 shadow-sm mb-6">
         <div className="flex-1 relative">
@@ -374,86 +368,100 @@ useEffect(() => {
             className="w-full pl-10 pr-4 py-3 border border-emerald-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
           />
         </div>
-        <div className="flex gap-3">
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="px-4 py-3 border border-emerald-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none min-w-[140px]"
-          >
-            {getAvailableMonths().map((month) => (
-              <option key={month.value} value={month.value}>
-                {month.label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value)}
-            className="px-4 py-3 border border-emerald-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none min-w-[100px]"
-          >
-            {generateYearOptions().map((year) => (
-              <option key={year} value={year}>
-                {year}
-              </option>
-            ))}
-          </select>
-        </div>
+        <MonthSelector
+          selectedMonth={selectedMonth}
+          setSelectedMonth={setSelectedMonth}
+          selectedYear={selectedYear}
+          setSelectedYear={setSelectedYear}
+        />
       </div>
 
-      {/* Attendance Table */}
+      {/* Attendance Table with Fixed Columns and Scrollable Middle */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-emerald-100 dark:border-gray-700 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <div className="flex min-w-max">
-            {/* Tabel Informasi Karyawan */}
-            <div className="flex-shrink-0">
-              <table className="border-collapse">
-                <thead>
-                  <tr>
-                    <th
-                      colSpan={4}
-                      className="h-12 bg-emerald-100 dark:bg-emerald-900/30 px-4 text-center text-sm font-semibold text-gray-900 dark:text-white border-b border-r border-emerald-200 dark:border-gray-600"
-                    >
-                      Informasi Karyawan
-                    </th>
+        <div className="flex relative">
+          {/* Fixed Left Column - Employee Info */}
+          <div className="sticky left-0 z-10">
+            <table className="border-collapse">
+              <thead>
+                <tr>
+                  <th
+                    colSpan={3}
+                    className="h-12 bg-emerald-100 dark:bg-emerald-900/30 px-4 text-center text-sm font-semibold text-gray-900 dark:text-white border-b border-r border-emerald-200 dark:border-gray-600"
+                  >
+                    Informasi Karyawan
+                  </th>
+                </tr>
+                <tr>
+                  <th className="h-10 w-16 px-3 bg-emerald-50 dark:bg-emerald-900/20 text-center text-xs font-medium text-gray-700 dark:text-gray-300 border-b border-r">
+                    No
+                  </th>
+                  <th className="h-10 w-48 px-3 bg-emerald-50 dark:bg-emerald-900/20 text-center text-xs font-medium text-gray-700 dark:text-gray-300 border-b border-r">
+                    Nama
+                  </th>
+                  <th className="h-10 w-36 px-3 bg-emerald-50 dark:bg-emerald-900/20 text-center text-xs font-medium text-gray-700 dark:text-gray-300 border-b border-r">
+                    NIP
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredEmployees.map((emp, i) => (
+                  <tr key={emp.id} className="hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-colors">
+                    <td className="h-16 w-16 px-3 text-center text-sm border-b border-r bg-white dark:bg-gray-800">
+                      {i + 1}
+                    </td>
+                    <td className="h-16 w-48 px-3 text-center text-sm border-b border-r bg-white dark:bg-gray-800">
+                      {emp.name}
+                    </td>
+                    <td className="h-16 w-36 px-3 text-center text-sm border-b border-r bg-white dark:bg-gray-800">
+                      {emp.nip}
+                    </td>
                   </tr>
-                  <tr>
-                    <th className="h-10 w-16 px-3 bg-emerald-50 dark:bg-emerald-900/20 text-center text-xs font-medium text-gray-700 dark:text-gray-300 border-b border-r">
-                      No
-                    </th>
-                    <th className="h-10 w-48 px-3 bg-emerald-50 dark:bg-emerald-900/20 text-center text-xs font-medium text-gray-700 dark:text-gray-300 border-b border-r">
-                      Nama
-                    </th>
-                    <th className="h-10 w-36 px-3 bg-emerald-50 dark:bg-emerald-900/20 text-center text-xs font-medium text-gray-700 dark:text-gray-300 border-b border-r">
-                      NIP
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredEmployees.map((emp, i) => (
-                    <tr key={emp.id} className="hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-colors">
-                      <td className="h-16 w-16 px-3 text-center text-sm border-b border-r">{i + 1}</td>
-                      <td className="h-16 w-48 px-3 text-center text-sm border-b border-r">{emp.name}</td>
-                      <td className="h-16 w-36 px-3 text-center text-sm border-b border-r">{emp.nip}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-            {/* Tabel Absensi */}
-            <div className="flex-1 overflow-x-auto">
-              <table className="border-collapse w-full">
+          {/* Scrollable Middle Column - Attendance Data */}
+          <div className="relative flex-1 overflow-hidden">
+            {/* Scroll buttons */}
+            {showLeftScroll && (
+              <button
+                onClick={scrollLeft}
+                className="absolute left-0 top-1/2 transform -translate-y-1/2 z-20 bg-emerald-600 text-white rounded-r-lg p-2 shadow-lg hover:bg-emerald-700 transition-colors"
+                aria-label="Scroll left"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+            )}
+
+            {showRightScroll && (
+              <button
+                onClick={scrollRight}
+                className="absolute right-0 top-1/2 transform -translate-y-1/2 z-20 bg-emerald-600 text-white rounded-l-lg p-2 shadow-lg hover:bg-emerald-700 transition-colors"
+                aria-label="Scroll right"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            )}
+
+            <div
+              ref={scrollContainerRef}
+              className="overflow-x-auto scrollbar-thin scrollbar-thumb-emerald-500 scrollbar-track-emerald-100"
+              style={{ maxWidth: "calc(100vw - 400px)" }}
+              onScroll={handleScroll}
+            >
+              <table className="border-collapse w-max">
                 <thead>
                   <tr>
                     <th
-                      colSpan={31}
-                      className="h-12 bg-emerald-100 dark:bg-emerald-900/30 px-4 text-center text-sm font-semibold border-b border-r"
+                      colSpan={getDaysInSelectedMonth().length}
+                      className="h-12 bg-emerald-100 dark:bg-emerald-900/30 px-4 text-center text-sm font-semibold border-b border-r sticky top-0"
                     >
                       Absensi - {getSelectedMonthName()} {selectedYear}
                     </th>
                   </tr>
-                  <tr>
-                    {getDaysInMonth().map((day) => (
+                  <tr className="sticky top-12">
+                    {getDaysInSelectedMonth().map((day) => (
                       <th
                         key={day}
                         className="h-10 w-12 px-2 bg-emerald-50 dark:bg-emerald-900/20 text-center text-xs font-medium border-b border-r"
@@ -466,7 +474,7 @@ useEffect(() => {
                 <tbody>
                   {filteredEmployees.map((emp) => (
                     <tr key={emp.id} className="hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-colors">
-                      {getDaysInMonth().map((day) => {
+                      {getDaysInSelectedMonth().map((day) => {
                         const dayStr = day.toString().padStart(2, "0")
                         const dateKey = `${selectedYear}-${selectedMonth}-${dayStr}`
                         const status = emp.attendance?.[dateKey] || "tidak"
@@ -478,7 +486,13 @@ useEffect(() => {
                                 status,
                               )}`}
                               title={
-                                status === "hadir" ? "Hadir" : status === "terlambat" ? "Terlambat" : "Tidak Hadir"
+                                status === "hadir" || status === "tepat waktu"
+                                  ? "Hadir"
+                                  : status === "terlambat"
+                                    ? "Terlambat"
+                                    : status === "absen"
+                                      ? "Tidak Hadir"
+                                      : "Belum Ada Data"
                               }
                             >
                               {getAttendanceText(status)}
@@ -491,25 +505,28 @@ useEffect(() => {
                 </tbody>
               </table>
             </div>
-            {/* summary */}
-            <div className="flex-shrink-0">
-              <table className="border-collapse">
-                <thead>
-                  <tr>
-                    <th className="h-12 w-24 bg-emerald-100 dark:bg-emerald-900/30 px-4 text-center text-sm font-semibold text-gray-900 dark:text-white border-b">
-                      Total
-                    </th>
-                  </tr>
-                  <tr>
-                    <th className="h-10 w-24 bg-emerald-50 dark:bg-emerald-900/20 text-center text-xs font-medium text-gray-700 dark:text-gray-300 border-b">
-                      &nbsp;
-                    </th>
-                  </tr>
-                </thead>
-               <tbody>
+          </div>
+
+          {/* Fixed Right Columns - Summary and Actions */}
+          <div className="sticky right-0 z-10 flex">
+            {/* Summary */}
+            <table className="border-collapse">
+              <thead>
+                <tr>
+                  <th className="h-12 w-24 bg-emerald-100 dark:bg-emerald-900/30 px-4 text-center text-sm font-semibold text-gray-900 dark:text-white border-b">
+                    Total
+                  </th>
+                </tr>
+                <tr>
+                  <th className="h-10 w-24 bg-emerald-50 dark:bg-emerald-900/20 text-center text-xs font-medium text-gray-700 dark:text-gray-300 border-b border-l">
+                    H(T)/Total
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
                 {filteredEmployees.map((emp) => (
                   <tr key={emp.id} className="hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-colors">
-                    <td className="h-16 w-24 px-3 text-center border-b">
+                    <td className="h-16 w-24 px-3 text-center border-b border-l bg-white dark:bg-gray-800">
                       <div className="flex items-center justify-center font-mono text-sm text-gray-700 dark:text-gray-200">
                         {emp.summary}
                       </div>
@@ -517,43 +534,40 @@ useEffect(() => {
                   </tr>
                 ))}
               </tbody>
-              </table>
-            </div>
+            </table>
 
             {/* Aksi */}
-            <div className="flex-shrink-0">
-              <table className="border-collapse">
-                <thead>
-                  <tr>
-                    <th className="h-12 w-24 bg-emerald-100 dark:bg-emerald-900/30 px-4 text-center text-sm font-semibold text-gray-900 dark:text-white border-b">
-                      Aksi
-                    </th>
+            <table className="border-collapse">
+              <thead>
+                <tr>
+                  <th className="h-12 w-24 bg-emerald-100 dark:bg-emerald-900/30 px-4 text-center text-sm font-semibold text-gray-900 dark:text-white border-b">
+                    Aksi
+                  </th>
+                </tr>
+                <tr>
+                  <th className="h-10 w-24 bg-emerald-50 dark:bg-emerald-900/20 text-center text-xs font-medium text-gray-700 dark:text-gray-300 border-b border-l">
+                    &nbsp;
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredEmployees.map((emp) => (
+                  <tr key={emp.id} className="hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-colors">
+                    <td className="h-16 w-24 px-3 text-center border-b border-l bg-white dark:bg-gray-800">
+                      <div className="flex items-center justify-center">
+                        <button
+                          onClick={() => handleDeleteEmployee(emp.id, emp.name)}
+                          className="p-2 text-red-600 hover:bg-red-100 dark:hover:bg-red-900 rounded-lg transition-colors"
+                          title={`Hapus data ${emp.name}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
-                  <tr>
-                    <th className="h-10 w-24 bg-emerald-50 dark:bg-emerald-900/20 text-center text-xs font-medium text-gray-700 dark:text-gray-300 border-b">
-                      &nbsp;
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredEmployees.map((emp) => (
-                    <tr key={emp.id} className="hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-colors">
-                      <td className="h-16 w-24 px-3 text-center border-b">
-                        <div className="flex items-center justify-center">
-                          <button
-                            onClick={() => handleDeleteEmployee(emp.id, emp.name)}
-                            className="p-2 text-red-600 hover:bg-red-100 dark:hover:bg-red-900 rounded-lg transition-colors"
-                            title={`Hapus data ${emp.name}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

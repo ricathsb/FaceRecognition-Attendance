@@ -15,34 +15,43 @@ export default function AuthGuard({ children, requiredRole }: AuthGuardProps) {
     const router = useRouter()
     const pathname = usePathname()
     const [isValidating, setIsValidating] = useState(true)
+    const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
-        const checkAuth = () => {
-            // Validate authentication
-            if (!validateAuth()) {
-                // Clear any remaining data and redirect to login
-                clearUserRole()
-                router.replace(`/login?redirect=${encodeURIComponent(pathname)}`)
-                return
-            }
-
-            // Check role if required
-            if (requiredRole) {
-                const userRole = getUserRole()
-                if (userRole !== requiredRole) {
-                    // Redirect based on actual role
-                    if (userRole === "admin") {
-                        router.replace("/dashboard")
-                    } else if (userRole === "user") {
-                        router.replace("/")
-                    } else {
-                        router.replace("/login")
-                    }
+        const checkAuth = async () => {
+            try {
+                // Validate authentication
+                if (!validateAuth()) {
+                    // Clear any remaining data and redirect to login
+                    clearUserRole()
+                    router.replace(`/login?redirect=${encodeURIComponent(pathname)}`)
                     return
                 }
-            }
 
-            setIsValidating(false)
+                // Check role if required
+                if (requiredRole) {
+                    const userRole = getUserRole()
+                    if (userRole !== requiredRole) {
+                        // Redirect based on actual role
+                        if (userRole === "admin") {
+                            router.replace("/dashboard")
+                        } else if (userRole === "user") {
+                            router.replace("/")
+                        } else {
+                            clearUserRole()
+                            router.replace("/login")
+                        }
+                        return
+                    }
+                }
+
+                setIsValidating(false)
+            } catch (err) {
+                console.error("Auth validation error:", err)
+                setError("Terjadi kesalahan saat validasi autentikasi")
+                clearUserRole()
+                router.replace("/login")
+            }
         }
 
         checkAuth()
@@ -57,7 +66,13 @@ export default function AuthGuard({ children, requiredRole }: AuthGuardProps) {
 
         // Listen for focus events to revalidate auth
         const handleFocus = () => {
-            if (!validateAuth()) {
+            try {
+                if (!validateAuth()) {
+                    clearUserRole()
+                    router.replace("/login")
+                }
+            } catch (err) {
+                console.error("Focus auth validation error:", err)
                 clearUserRole()
                 router.replace("/login")
             }
@@ -72,11 +87,35 @@ export default function AuthGuard({ children, requiredRole }: AuthGuardProps) {
         }
     }, [pathname, router, requiredRole])
 
-    // Show loading or nothing while validating
-    if (isValidating) {
+    // Show error if any
+    if (error) {
         return (
             <div className="min-h-screen flex items-center justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                <div className="text-center">
+                    <div className="text-red-600 mb-4">{error}</div>
+                    <button
+                        onClick={() => {
+                            setError(null)
+                            clearUserRole()
+                            router.replace("/login")
+                        }}
+                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                        Kembali ke Login
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
+    // Show loading while validating
+    if (isValidating) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-100">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Memvalidasi autentikasi...</p>
+                </div>
             </div>
         )
     }
