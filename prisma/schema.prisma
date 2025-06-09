@@ -1,5 +1,3 @@
-// prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,25 +7,46 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Karyawan {
-  id            Int      @id @default(autoincrement())
-  nama          String
-  nip           String   @unique
-  foto_filename String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  face_embedding String?
-  // Relasi ke CatatanAbsensi: Seorang Karyawan bisa memiliki banyak CatatanAbsensi
-  catatanAbsensi CatatanAbsensi[]
-}
-
 model CatatanAbsensi {
   id                Int      @id @default(autoincrement())
   timestamp_absensi DateTime
-  status            String   // misalnya "masuk", "pulang", "izin", "sakit"
+  status            String
   createdAt         DateTime @default(now())
+  karyawanId        Int
+  karyawan          Karyawan @relation(fields: [karyawanId], references: [id])
 
-  // Relasi ke Karyawan
-  karyawan    Karyawan @relation(fields: [karyawanId], references: [id])
-  karyawanId  Int      // Ini adalah foreign key yang merujuk ke Karyawan.id
+  @@map("CatatanAbsensi")
 }
+
+model PengaturanAbsensi {
+  id               Int      @id @default(autoincrement())
+  waktuMulaiAbsen  String
+  batasTepatWaktu  String
+  batasTerlambat   String
+  hariKerja        String[] // array string PostgreSQL
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("PengaturanAbsensi")
+}
+
+
+
+model Karyawan {
+  id             Int              @id @default(autoincrement())
+  nama           String
+  nip            String           @unique
+  foto_filename  String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  face_embedding String?
+  email          String?          @unique
+  password       String?
+  catatanAbsensi CatatanAbsensi[]
+
+  @@map("Karyawan")
+}
+
+/// We could not retrieve columns for the underlying table. Either it has none or you are missing rights to see them. Please check your privileges.
+// model admin {
+// }

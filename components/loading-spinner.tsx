@@ -20,17 +20,17 @@ export function LoadingSpinner() {
           />
           <motion.div
             animate={{ rotate: 360 }}
-            transition={{ 
-              duration: 1, 
-              repeat: Infinity, 
+            transition={{
+              duration: 1,
+              repeat: Infinity,
               ease: "linear",
-              repeatType: "loop" 
+              repeatType: "loop"
             }}
             className="absolute inset-0 border-4 border-t-blue-600 rounded-full"
           />
         </div>
         <p className="mt-4 text-gray-700 font-medium">Processing...</p>
-        <p className="text-sm text-gray-500 mt-1">Identifying student</p>
+        <p className="text-sm text-gray-500 mt-1">Identifying </p>
       </motion.div>
     </div>
   );
