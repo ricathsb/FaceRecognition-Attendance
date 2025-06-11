@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
-import { Search, Save, X, Clock, Trash2, AlertCircle, Info, ChevronLeft, ChevronRight } from "lucide-react"
+import { Search, Save, X, Clock, Trash2, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import MonthSelector from "@/components/month-selector"
 
@@ -79,13 +79,17 @@ export default function ManagementPage() {
 
   const getAttendanceColor = (status: string) => {
     switch (status) {
-      case "hadir":``
+      case "hadir":
       case "tepat waktu":
         return "bg-green-500"
       case "terlambat":
         return "bg-yellow-500"
       case "absen":
         return "bg-red-500"
+      case "sabtu":
+        return "bg-blue-500"
+      case "minggu":
+        return "bg-purple-500"
       default:
         return "bg-gray-300"
     }
@@ -100,6 +104,10 @@ export default function ManagementPage() {
         return "T"
       case "absen":
         return "A"
+      case "sabtu":
+        return "S"
+      case "minggu":
+        return "M"
       default:
         return "?"
     }
@@ -185,7 +193,7 @@ export default function ManagementPage() {
       const res = await fetch(`/api/karyawan/management?month=${selectedMonth}&year=${selectedYear}`)
       const data = await res.json()
 
-      console.log(" Data API Management:", data)
+      console.log("📊 Data API Management:", data)
 
       if (data.attendanceSettings) {
         setAttendanceSettings({
@@ -339,9 +347,17 @@ export default function ManagementPage() {
                 <span className="inline-block w-3 h-3 rounded-full bg-yellow-500 mr-2"></span>
                 Terlambat: Absen {attendanceSettings.onTimeBeforeHour} - {attendanceSettings.lateBeforeHour}
               </div>
-              <div>
+              <div className="flex items-center">
                 <span className="inline-block w-3 h-3 rounded-full bg-red-500 mr-2"></span>
                 Tidak Hadir: Tidak absen atau absen setelah {attendanceSettings.lateBeforeHour}
+              </div>
+              <div className="flex items-center">
+                <span className="inline-block w-3 h-3 rounded-full bg-blue-500 mr-2"></span>
+                Sabtu: Hari Sabtu
+              </div>
+              <div className="flex items-center">
+                <span className="inline-block w-3 h-3 rounded-full bg-purple-500 mr-2"></span>
+                Minggu: Hari Minggu
               </div>
             </div>
           </div>
@@ -353,8 +369,6 @@ export default function ManagementPage() {
           </div>
         </div>
       </div>
-
-
 
       {/* Search and Filter */}
       <div className="flex flex-col lg:flex-row gap-4 p-6 bg-white dark:bg-gray-800 rounded-xl border border-emerald-100 dark:border-gray-700 shadow-sm mb-6">
@@ -492,7 +506,11 @@ export default function ManagementPage() {
                                     ? "Terlambat"
                                     : status === "absen"
                                       ? "Tidak Hadir"
-                                      : "Belum Ada Data"
+                                      : status === "sabtu"
+                                        ? "Sabtu"
+                                        : status === "minggu"
+                                          ? "Minggu"
+                                          : "Belum Ada Data"
                               }
                             >
                               {getAttendanceText(status)}
