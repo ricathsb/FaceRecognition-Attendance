@@ -9,9 +9,6 @@ dayjs.extend(timezone)
 
 export const dynamic = "force-dynamic"
 
-// Perbaiki fungsi GET untuk menghitung hari kerja berdasarkan bulan yang dipilih
-// Tambahkan parameter query untuk bulan dan tahun
-
 export async function GET(request: NextRequest) {
   try {
     // Ambil parameter bulan dan tahun dari query URL
@@ -61,6 +58,11 @@ export async function GET(request: NextRequest) {
       "sunday",
     ]
 
+    console.log("🔍 Debug Info:")
+    console.log("Selected Month:", selectedMonth + 1, "Year:", selectedYear)
+    console.log("Days in Month:", daysInMonth)
+    console.log("Work Days Setting:", workDays)
+
     const hasil = karyawanList.map((karyawan) => {
       const attendance: { [tanggal: string]: string } = {}
 
@@ -86,33 +88,48 @@ export async function GET(request: NextRequest) {
       let totalWorkDays = 0
       let absenCount = 0
 
-      // Proses setiap hari dalam bulan yang dipilih
+      // Proses setiap hari dalam bulan yang dipilih (SEMUA HARI)
       for (let d = 1; d <= daysInMonth; d++) {
         const date = dayjs(new Date(selectedYear, selectedMonth, d)).tz("Asia/Jakarta")
         const tanggalStr = date.format("YYYY-MM-DD")
         const dayOfWeek = date.format("dddd").toLowerCase()
 
-        // Lewati hari yang bukan hari kerja
-        if (!workDays.includes(dayOfWeek)) continue
+        // Tentukan status berdasarkan hari
+        if (dayOfWeek === "saturday") {
+          // Sabtu - beri status khusus
+          if (!attendance[tanggalStr]) {
+            attendance[tanggalStr] = "sabtu"
+          }
+        } else if (dayOfWeek === "sunday") {
+          // Minggu - beri status khusus
+          if (!attendance[tanggalStr]) {
+            attendance[tanggalStr] = "minggu"
+          }
+        } else if (workDays.includes(dayOfWeek)) {
+          // Hari kerja normal - HITUNG SEBAGAI HARI KERJA
+          totalWorkDays++
+          console.log(`Day ${d} (${dayOfWeek}): counted as work day. Total so far: ${totalWorkDays}`)
 
-        totalWorkDays++
+          const isBeforeToday = date.isBefore(now, "day")
+          const hasNoAttendanceRecord = !attendance[tanggalStr]
 
-        // Tandai sebagai absen jika hari sudah lewat dan tidak ada catatan absensi
-        if (!attendance[tanggalStr] && date.isBefore(now, "day")) {
-          attendance[tanggalStr] = "absen"
+          if (hasNoAttendanceRecord && isBeforeToday) {
+            attendance[tanggalStr] = "absen"
+          }
+
+          const status = attendance[tanggalStr]
+
+          // Hitung statistik absensi (hanya untuk hari kerja)
+          if (status === "tepat waktu") {
+            hadirCount++
+          } else if (status === "terlambat") {
+            hadirCount++
+            terlambatCount++
+          } else if (status === "absen") {
+            absenCount++
+          }
         }
-
-        const status = attendance[tanggalStr]
-
-        // Hitung statistik absensi
-        if (status === "tepat waktu") {
-          hadirCount++
-        } else if (status === "terlambat") {
-          hadirCount++
-          terlambatCount++
-        } else if (status === "absen") {
-          absenCount++
-        }
+        // HAPUS bagian else yang menghitung hari lain sebagai absen
       }
 
       // Buat ringkasan dalam format: hadir(terlambat)/total_hari_kerja

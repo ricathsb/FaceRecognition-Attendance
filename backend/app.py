@@ -207,7 +207,7 @@ def login():
         cursor.close()
         conn.close()
 
-
+# --- Health check endpoint ---
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({'status': 'OK', 'message': 'Flask server is running'}), 200
