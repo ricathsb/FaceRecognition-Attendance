@@ -90,7 +90,9 @@ export async function POST(request: NextRequest) {
 
     await fs.mkdir(uploadDir, { recursive: true })
     const filePath = path.join(uploadDir, fotoFilename)
-    await fs.writeFile(filePath, buffer)
+    await fs.writeFile(filePath, new Uint8Array(buffer))
+
+
 
     const fotoDbPath = `/uploads/karyawan_photos/${fotoFilename}`
     const encodedFaceString = JSON.stringify(flaskData.face_encoding)

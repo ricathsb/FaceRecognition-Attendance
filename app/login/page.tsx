@@ -56,12 +56,10 @@ export default function LoginPage() {
                 // Simpan data tambahan ke localStorage untuk backward compatibility
                 if (data.role === "admin") {
                     localStorage.setItem("userType", "admin")
-                    // Use replace instead of push to prevent back navigation
                     router.replace("/dashboard")
                 } else if (data.role === "user") {
                     localStorage.setItem("nama", data.nama)
                     localStorage.setItem("userType", "karyawan")
-                    // Use replace instead of push to prevent back navigation
                     router.replace("/")
                 }
             } else {
@@ -78,10 +76,8 @@ export default function LoginPage() {
         <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 flex items-center justify-center p-4">
             <div className="w-full max-w-4xl">
                 <div className="bg-white rounded-3xl shadow-2xl overflow-hidden flex">
-                    {/* Left side - Login Form */}
                     <div className="w-full lg:w-1/2 p-8 lg:p-12">
                         <div className="max-w-md mx-auto">
-                            {/* Avatar and Welcome */}
                             <div className="text-center mb-8">
                                 <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
                                     <User className="h-8 w-8 text-emerald-600" />
@@ -91,7 +87,7 @@ export default function LoginPage() {
                             </div>
 
                             <form onSubmit={handleLogin} className="space-y-6">
-                                {/* Email Field */}
+                                {/* Email */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
                                     <div className="relative">
@@ -109,7 +105,7 @@ export default function LoginPage() {
                                     </div>
                                 </div>
 
-                                {/* Password Field */}
+                                {/* Password  */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
                                     <div className="relative">
@@ -133,6 +129,8 @@ export default function LoginPage() {
                                         </button>
                                     </div>
                                 </div>
+
+
 
                                 {/* Error Message */}
                                 {error && (
@@ -160,9 +158,8 @@ export default function LoginPage() {
                         </div>
                     </div>
 
-                    {/* Right side - Simple Elegant Design */}
+
                     <div className="hidden lg:block lg:w-1/2 relative bg-gradient-to-br from-emerald-600 to-teal-700 overflow-hidden">
-                        {/* Subtle Background Pattern */}
                         <div className="absolute inset-0 opacity-5">
                             <div className="absolute top-0 left-0 w-full h-full">
                                 <div className="grid grid-cols-6 gap-8 h-full p-8 transform rotate-45 scale-150">
@@ -180,15 +177,12 @@ export default function LoginPage() {
                             </div>
                         </div>
 
-                        {/* Main Content */}
                         <div className="relative z-10 h-full flex flex-col justify-center items-center p-12 text-white">
-                            {/* Logo/Icon */}
                             <div className="text-center mb-12">
                                 <div className="w-20 h-20 bg-white/15 backdrop-blur-sm rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-lg">
                                     <GraduationCap className="h-10 w-10 text-white" />
                                 </div>
 
-                                {/* School Name */}
                                 <div className="space-y-3">
                                     <h1 className="text-3xl font-bold leading-tight">Madrasah Aliyah Swasta</h1>
                                     <h2 className="text-4xl font-extrabold bg-gradient-to-r from-white to-emerald-100 bg-clip-text text-transparent">
@@ -197,14 +191,13 @@ export default function LoginPage() {
                                     <h3 className="text-2xl font-semibold text-emerald-100">Medan</h3>
                                 </div>
 
-                                {/* Subtitle */}
                                 <div className="mt-8 space-y-2">
                                     <p className="text-emerald-100 text-lg font-medium">Sistem Absensi Digital</p>
                                     <div className="w-24 h-1 bg-gradient-to-r from-emerald-300 to-teal-300 rounded-full mx-auto"></div>
                                 </div>
                             </div>
 
-                            {/* Islamic Pattern Decoration */}
+
                             <div className="absolute top-8 right-8 w-16 h-16 border-2 border-white/20 rounded-lg transform rotate-45"></div>
                             <div className="absolute bottom-8 left-8 w-12 h-12 border-2 border-white/20 rounded-lg transform rotate-45"></div>
                             <div className="absolute top-1/4 left-12 w-8 h-8 border-2 border-white/20 rounded-lg transform rotate-45"></div>

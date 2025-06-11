@@ -1,4 +1,4 @@
-// File: lib/api.ts (atau @/lib/api.ts)
+
 
 // Definisikan tipe data untuk respons registrasi
 export interface RegisterResponse {
