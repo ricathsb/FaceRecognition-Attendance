@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import type React from "react"
 
 interface MonthSelectorProps {
     selectedMonth: string
@@ -9,12 +9,12 @@ interface MonthSelectorProps {
     setSelectedYear: (year: string) => void
 }
 
-export default function MonthSelector({
+const MonthSelector: React.FC<MonthSelectorProps> = ({
     selectedMonth,
     setSelectedMonth,
     selectedYear,
     setSelectedYear,
-}: MonthSelectorProps) {
+}) => {
     const allMonths = [
         { value: "01", label: "Januari" },
         { value: "02", label: "Februari" },
@@ -30,22 +30,7 @@ export default function MonthSelector({
         { value: "12", label: "Desember" },
     ]
 
-    const getAvailableMonths = () => {
-        const currentYear = new Date().getFullYear()
-        const currentMonth = new Date().getMonth() + 1
-
-        if (Number.parseInt(selectedYear) === currentYear) {
-            // Untuk tahun saat ini, hanya tampilkan bulan sampai bulan saat ini
-            return allMonths.filter((month) => Number.parseInt(month.value) <= currentMonth)
-        } else if (Number.parseInt(selectedYear) < currentYear) {
-            // Untuk tahun lalu, tampilkan semua bulan
-            return allMonths
-        } else {
-            // Untuk tahun masa depan, tampilkan semua bulan (biarkan user memilih)
-            return allMonths
-        }
-    }
-
+    // FUNGSI GENERATE TAHUN YANG BARU
     const generateYearOptions = () => {
         const currentYear = new Date().getFullYear()
         const startYear = 2025
@@ -57,23 +42,19 @@ export default function MonthSelector({
         return years
     }
 
-    useEffect(() => {
-        const availableMonths = getAvailableMonths()
-        const isSelectedMonthAvailable = availableMonths.some((month) => month.value === selectedMonth)
+    const years = generateYearOptions()
 
-        if (!isSelectedMonthAvailable && availableMonths.length > 0) {
-            setSelectedMonth(availableMonths[availableMonths.length - 1].value)
-        }
-    }, [selectedYear, selectedMonth])
+    console.log("🗓️ Generated years:", years) // Debug log
+    console.log("📅 Current year:", new Date().getFullYear())
 
     return (
-        <div className="flex gap-3">
+        <div className="flex items-center gap-2">
             <select
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
-                className="px-4 py-3 border border-emerald-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none min-w-[140px]"
+                className="px-4 py-3 border border-emerald-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
             >
-                {getAvailableMonths().map((month) => (
+                {allMonths.map((month) => (
                     <option key={month.value} value={month.value}>
                         {month.label}
                     </option>
@@ -82,9 +63,9 @@ export default function MonthSelector({
             <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}
-                className="px-4 py-3 border border-emerald-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none min-w-[100px]"
+                className="px-4 py-3 border border-emerald-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
             >
-                {generateYearOptions().map((year) => (
+                {years.map((year) => (
                     <option key={year} value={year}>
                         {year}
                     </option>
@@ -93,3 +74,5 @@ export default function MonthSelector({
         </div>
     )
 }
+
+export default MonthSelector
