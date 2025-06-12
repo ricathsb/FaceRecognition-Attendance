@@ -9,7 +9,6 @@ import re
 import face_recognition
 import bcrypt
 
-# Impor untuk koneksi database
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv

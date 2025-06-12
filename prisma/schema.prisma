@@ -30,8 +30,6 @@ model PengaturanAbsensi {
   @@map("PengaturanAbsensi")
 }
 
-
-
 model Karyawan {
   id             Int              @id @default(autoincrement())
   nama           String
@@ -45,6 +43,17 @@ model Karyawan {
   catatanAbsensi CatatanAbsensi[]
 
   @@map("Karyawan")
+}
+
+model HariLibur {
+  id          Int      @id @default(autoincrement())
+  tanggal     DateTime
+  keterangan  String   @default("Hari Libur")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tanggal])
+  @@map("HariLibur")
 }
 
 /// We could not retrieve columns for the underlying table. Either it has none or you are missing rights to see them. Please check your privileges.

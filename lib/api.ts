@@ -1,5 +1,3 @@
-
-
 // Definisikan tipe data untuk respons registrasi
 export interface RegisterResponse {
   success: boolean
@@ -108,7 +106,16 @@ export async function markAttendance(imageData: string): Promise<AttendanceRespo
  */
 export async function getDashboardData() {
   try {
-    const response = await fetch("/api/dashboard")
+    // Tambahkan timestamp untuk mencegah caching
+    const timestamp = new Date().getTime()
+    const response = await fetch(`/api/dashboard?t=${timestamp}`, {
+      method: "GET",
+      headers: {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+      },
+    })
+
     const data = await response.json()
 
     if (!response.ok) {
@@ -118,6 +125,49 @@ export async function getDashboardData() {
     return data
   } catch (error: any) {
     console.error("Error getting dashboard data:", error)
+    throw error
+  }
+}
+
+/**
+ * Fungsi untuk mendapatkan data management dengan cache busting
+ */
+export async function getManagementData(month: string, year: string) {
+  try {
+    const timestamp = new Date().getTime()
+    const response = await fetch(`/api/karyawan/management?month=${month}&year=${year}&t=${timestamp}`, {
+      method: "GET",
+      headers: {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+      },
+      next: { revalidate: 0 }, // Pastikan tidak di-cache oleh Next.js
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error("API Error Response:", errorText)
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    // Try to parse JSON
+    let data
+    try {
+      data = await response.json()
+    } catch (parseError) {
+      console.error("Failed to parse JSON:", parseError)
+      throw new Error("Respons server tidak valid. Silakan coba lagi.")
+    }
+
+    // Validasi data yang diterima
+    if (!data || !Array.isArray(data.employees)) {
+      console.error("Invalid data structure:", data)
+      throw new Error("Format data tidak valid")
+    }
+
+    return data
+  } catch (error: any) {
+    console.error("Error getting management data:", error)
     throw error
   }
 }

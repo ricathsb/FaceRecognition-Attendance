@@ -34,7 +34,7 @@ export function AttendanceForm({ onSuccess, onError, onLoading }: AttendanceForm
       toast({
         title: "Memproses Absensi",
         description: "Sedang memverifikasi identitas karyawan dan mencatat kehadiran...",
-        duration: 3000,
+        duration: 2000,
       })
 
       // imageSrc sudah berformat data URL: 'data:image/jpeg;base64,...'
