@@ -23,12 +23,8 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Parameter bulan dan tahun diperlukan." }, { status: 400 });
     }
 
-    console.log("[INFO] Params:", { month, year });
-
     const start = dayjs(`${year}-${month}-01`).startOf("month").tz("Asia/Jakarta").toDate();
     const end = dayjs(start).endOf("month").tz("Asia/Jakarta").toDate();
-
-    console.log("[INFO] Date Range:", start, "to", end);
 
     const data = await prisma.catatanAbsensi.findMany({
       where: {
@@ -39,11 +35,7 @@ export async function GET(req: Request) {
       },
       include: {
         karyawan: {
-          select: {
-            nama: true,
-            nip: true,
-            status: true,
-          },
+          select: { nama: true, nip: true, status: true },
         },
       },
       orderBy: {
@@ -51,79 +43,101 @@ export async function GET(req: Request) {
       },
     });
 
-    console.log("[INFO] Absensi ditemukan:", data.length);
-
-    // === Embed font langsung ===
-    const fontRegularPath = path.resolve(process.cwd(), "public", "fonts", "Roboto-Regular.ttf");
-    const fontBoldPath = path.resolve(process.cwd(), "public", "fonts", "Roboto-Bold.ttf");
-
-    if (!fs.existsSync(fontRegularPath) || !fs.existsSync(fontBoldPath)) {
-      console.error("[ERROR] Font tidak ditemukan di direktori public/fonts/");
-      return NextResponse.json({ error: "Font PDF tidak ditemukan." }, { status: 500 });
-    }
+    const fontRegular = path.resolve(process.cwd(), "public", "fonts", "Roboto-Regular.ttf");
+    const fontBold = path.resolve(process.cwd(), "public", "fonts", "Roboto-Bold.ttf");
 
     const doc = new PDFDocument({
-      margin: 40,
+      margin: 50,
       size: "A4",
-      font: fontRegularPath, // hindari default Helvetica
+      font: fontRegular,
     });
 
-    // Register bold font
-    doc.registerFont("regular", fontRegularPath);
-    doc.registerFont("bold", fontBoldPath);
+    doc.registerFont("regular", fontRegular);
+    doc.registerFont("bold", fontBold);
 
-    const bufferChunks: Uint8Array[] = [];
-    doc.on("data", (chunk) => bufferChunks.push(chunk));
+    const buffers: Uint8Array[] = [];
+    doc.on("data", (chunk) => buffers.push(chunk));
     const done = new Promise<Buffer>((resolve, reject) => {
-      doc.on("end", () => resolve(Buffer.concat(bufferChunks)));
+      doc.on("end", () => resolve(Buffer.concat(buffers)));
       doc.on("error", reject);
     });
 
-    // === PDF UI ===
-    doc.font("bold").fontSize(16).text(`Rekap Absensi MAS AI Ittihadiyah Bulan ${dayjs(start).format("MMMM YYYY")}`, { align: "center" });
-    doc.moveDown();
+    // ====== HEADER ======
+    doc.font("bold").fontSize(20).text("REKAP ABSENSI AL ITTIHADIYAH", { align: "center" });
+    doc.moveDown(0.5);
+    doc.font("regular").fontSize(12).text(`Periode: ${dayjs(start).format("MMMM YYYY")}`, { align: "center" });
 
-    // Header Tabel
-    const tableTop = doc.y + 10;
-    const colWidths = [30, 140, 100, 100, 150]; // no, nama, nip, status, waktu
+    doc.moveDown(1);
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor("#444").lineWidth(1).stroke();
+    doc.moveDown(1);
 
-    const drawRow = (y: number, columns: string[], isHeader = false) => {
-      const font = isHeader ? "bold" : "regular";
-      const fontSize = isHeader ? 10 : 9;
+    // ====== TABLE ======
+    const tableTop = doc.y;
+    const colWidths = [30, 130, 100, 70, 115, 75];
+    const headers = ["No", "Nama", "NIP", "Status", "Waktu", "Absensi"];
 
-      doc.font(font).fontSize(fontSize);
-      let x = doc.page.margins.left;
+    // Header Row
+    doc.rect(50, tableTop, 495, 20).fill("#f0f0f0").stroke();
+    doc.fillColor("#000").font("bold").fontSize(10);
 
-      columns.forEach((text, i) => {
-        doc.text(text, x, y, {
-          width: colWidths[i],
-          align: "left",
-        });
-        x += colWidths[i];
-      });
-    };
+    let x = 50;
+    headers.forEach((header, i) => {
+      doc.text(header, x + 2, tableTop + 5, { width: colWidths[i] - 4 });
+      x += colWidths[i];
+    });
 
-    // Tabel Header
-    drawRow(tableTop, ["No", "Nama", "NIP", "Status", "Waktu & Status"], true);
+    let y = tableTop + 20;
 
-    let rowY = tableTop + 20;
+    // Data Rows
+    data.forEach((item, i) => {
+      const rowHeight = 20; // bisa dibuat dinamis kalau perlu
+      const rowColor = i % 2 === 0 ? "#fff" : "#fafafa";
+      doc.rect(50, y, 495, rowHeight).fill(rowColor).stroke();
+      doc.font("regular").fontSize(9);
 
-    data.forEach((item, index) => {
+      let colX = 50;
       const waktu = dayjs(item.timestamp_absensi).tz("Asia/Jakarta").format("DD MMM YYYY HH:mm");
-      drawRow(rowY, [
-        String(index + 1),
+      const statusAbsensi = item.status;
+
+      const values = [
+        String(i + 1),
         item.karyawan.nama,
         item.karyawan.nip,
         item.karyawan.status,
-        `${waktu} | ${item.status}`,
-      ]);
-      rowY += 20;
+        waktu,
+        statusAbsensi,
+      ];
+
+      values.forEach((val, j) => {
+        // Highlight khusus untuk kolom "Status Absensi"
+        if (j === 5) {
+          if (val.toLowerCase().includes("terlambat")) doc.fillColor("#e57373"); // merah soft
+          else if (val.toLowerCase().includes("tepat")) doc.fillColor("#81c784"); // hijau soft
+          else doc.fillColor("#000");
+        } else {
+          doc.fillColor("#000");
+        }
+
+        doc.text(val, colX + 2, y + 5, {
+          width: colWidths[j] - 4,
+          height: rowHeight,
+        });
+        colX += colWidths[j];
+      });
+
+      y += rowHeight;
+    });
+
+    // Footer (opsional)
+    doc.moveDown(2);
+    doc.fontSize(10).fillColor("#666").text(`Generated at ${dayjs().tz("Asia/Jakarta").format("DD MMM YYYY HH:mm")}`, 50, y + 20, {
+      align: "right",
     });
 
     doc.end();
-    const pdfBuffer = await done;
+    const pdf = await done;
 
-    return new Response(pdfBuffer, {
+    return new Response(pdf, {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename=rekap-absensi-${month}-${year}.pdf`,
@@ -131,6 +145,6 @@ export async function GET(req: Request) {
     });
   } catch (err) {
     console.error("[ERROR] Gagal generate PDF:", err);
-    return NextResponse.json({ error: "Gagal membuat PDF." }, { status: 500 });
+    return NextResponse.json({ error: "Gagal membuat PDF" }, { status: 500 });
   }
 }
