@@ -13,6 +13,7 @@ model Karyawan {
   id            Int      @id @default(autoincrement())
   nama          String
   nip           String   @unique
+  status        String
   foto_filename String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
