@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
     const nip = body.nip?.toString().trim() || ""
     const email = body.email?.toString().trim() || ""
     const password = body.password?.toString().trim() || ""
+    const status = body.status?.toString().trim() || "Staff" // New status field
     const fotoWajah = body.fotoWajah || ""
 
     if (!nama || !nip || !email || !password || !fotoWajah) {
@@ -39,6 +40,11 @@ export async function POST(request: NextRequest) {
 
     if (!/^\d{5,12}$/.test(nip)) {
       return NextResponse.json({ message: "Format NIP tidak valid. NIP harus berupa 5-12 digit angka." }, { status: 400 })
+    }
+
+    // Validate status
+    if (!["Staff", "Teacher"].includes(status)) {
+      return NextResponse.json({ message: "Status harus berupa 'Staff' atau 'Teacher'." }, { status: 400 })
     }
 
     const existingByNip = await prisma.karyawan.findUnique({ where: { nip } })
@@ -92,8 +98,6 @@ export async function POST(request: NextRequest) {
     const filePath = path.join(uploadDir, fotoFilename)
     await fs.writeFile(filePath, new Uint8Array(buffer))
 
-
-
     const fotoDbPath = `/uploads/karyawan_photos/${fotoFilename}`
     const encodedFaceString = JSON.stringify(flaskData.face_encoding)
 
@@ -105,6 +109,7 @@ export async function POST(request: NextRequest) {
         nip,
         email,
         password: hashedPassword,
+        status, // Include status in the creation
         foto_filename: fotoDbPath,
         face_embedding: encodedFaceString,
       },
@@ -118,6 +123,7 @@ export async function POST(request: NextRequest) {
         nama,
         nip,
         email,
+        status,
         foto_filename: fotoDbPath,
         createdAt: karyawanData.createdAt,
       },

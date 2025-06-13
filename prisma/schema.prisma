@@ -40,6 +40,7 @@ model Karyawan {
   face_embedding String?
   email          String?          @unique
   password       String?
+  status         String           @default("Staff") // New status field
   catatanAbsensi CatatanAbsensi[]
 
   @@map("Karyawan")
