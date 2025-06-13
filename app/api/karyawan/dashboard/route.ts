@@ -21,22 +21,28 @@ export async function GET() {
     }
 
     const [totalKaryawan, semuaAbsensiHariIni] = await Promise.all([
-      prisma.karyawan.count(),
-      prisma.catatanAbsensi.findMany({
-        where: {
-          timestamp_absensi: {
-            gte: todayStart,
-            lte: todayEnd,
-          },
+  prisma.karyawan.count(),
+  prisma.catatanAbsensi.findMany({
+    where: {
+      timestamp_absensi: {
+        gte: todayStart,
+        lte: todayEnd,
+      },
+    },
+    include: {
+      karyawan: {
+        select: {
+          nama: true,
+          status: true,
         },
-        include: {
-          karyawan: true,
-        },
-        orderBy: {
-          timestamp_absensi: "desc",
-        },
-      }),
-    ])
+      },
+    },
+    orderBy: {
+      timestamp_absensi: "desc",
+    },
+  }),
+])
+
 
     const hadirSet = new Set()
     let hadir = 0
@@ -58,6 +64,7 @@ export async function GET() {
         aktivitasTerbaru.push({
           id,
           name: karyawan.nama,
+          role: karyawan.status,
           action: `Check-in pada ${dayjs(timestamp_absensi).tz("Asia/Jakarta").format("HH:mm")}`,
           time: dayjs(timestamp_absensi).tz("Asia/Jakarta").format("HH:mm"),
           status: status === "terlambat" ? "late" : "ontime",

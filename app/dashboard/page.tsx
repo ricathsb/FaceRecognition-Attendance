@@ -267,7 +267,10 @@ function DashboardContent() {
                                     className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                                 >
                                     <div className="flex-1 min-w-0">
-                                        <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{activity.name}</p>
+                                        <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">
+                                            {activity.name}
+                                            <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">({activity.role})</span>
+                                        </p>
                                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{activity.action}</p>
                                     </div>
                                     <div className="text-right flex-shrink-0 ml-4">

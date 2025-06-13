@@ -297,6 +297,24 @@ export default function ManagementPage() {
     setActiveTab("holidays")
   }
 
+  const downloadPDF = async () => {
+  try {
+    const res = await fetch(`/api/rekap-absensi?month=${selectedMonth}&year=${selectedYear}`)
+    if (!res.ok) throw new Error("Gagal mengunduh PDF")
+
+    const blob = await res.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `rekap-absensi-${selectedMonth}-${selectedYear}.pdf`
+    a.click()
+    window.URL.revokeObjectURL(url)
+  } catch (error) {
+    console.error("Download gagal:", error)
+    alert("Gagal mengunduh PDF rekap absensi.")
+  }
+}
+
   const getHolidayInfo = (dateStr: string) => {
     return holidays.find((holiday) => {
       const holidayDate = new Date(holiday.tanggal).toISOString().split("T")[0]
@@ -695,6 +713,12 @@ export default function ManagementPage() {
           selectedYear={selectedYear}
           setSelectedYear={setSelectedYear}
         />
+        <button
+        onClick={downloadPDF}
+        className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors"
+      >
+        Download Rekap PDF
+      </button>
       </div>
 
       {/* Attendance Table */}
