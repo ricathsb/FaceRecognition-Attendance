@@ -7,25 +7,22 @@ import numpy as np
 import os
 import re
 import face_recognition
-# import pickle # Tidak diperlukan lagi jika encoding disimpan di DB
+import bcrypt
 
-# Impor untuk koneksi database (contoh dengan psycopg2)
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 load_dotenv()
-# Asumsikan kamu akan memindahkan logika inti face recognition ke sini
-# atau fungsi-fungsi ini akan diimplementasikan untuk berinteraksi dengan DB
-# from model.face_recognizer import recognize_face_from_db, create_face_encoding_from_image
 
-app = Flask(__name__) # Menggunakan __name__ standar Flask
-CORS(app, resources={r"/*": {"origins": "*"}}) # Izinkan semua origin untuk development
+# Inisialisasi Flask app
+app = Flask(__name__)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
-# --- Konfigurasi Database (HARUS DISESUAIKAN) ---
+# Konfigurasi Database
 DB_HOST = os.environ.get("DB_HOST", "localhost")
-DB_NAME = os.environ.get("DB_NAME", "face_recognation") # Sesuaikan
-DB_USER = os.environ.get("DB_USER", "USER_DB_ANDA") # GANTI
-DB_PASS = os.environ.get("DB_PASS", "PASSWORD_DB_ANDA") # GANTI
+DB_NAME = os.environ.get("DB_NAME", "face_recognation")
+DB_USER = os.environ.get("DB_USER", "postgres")
+DB_PASS = os.environ.get("DB_PASS", "3421")
 
 def get_db_connection():
     try:
@@ -35,14 +32,10 @@ def get_db_connection():
         app.logger.error(f"Flask: Error connecting to PostgreSQL: {e}")
         return None
 
-# --- Fungsi bantu ---
-def sanitize_filename(name): # Fungsi ini mungkin masih berguna untuk hal lain, tapi tidak untuk nama file encoding
+def sanitize_filename(name):
     name = re.sub(r'[^\w\s-]', '', name).strip()
     name = re.sub(r'[-\s]+', '_', name)
     return name.lower()
-
-# Fungsi load_known_faces() dan save_known_faces() yang menggunakan pickle DIHAPUS
-# karena data akan diambil/disimpan ke database.
 
 # --- Endpoint absensi ---
 @app.route('/attendance', methods=['POST'])
@@ -70,9 +63,9 @@ def attendance():
         if not current_face_encodings:
             return jsonify({'error': 'Could not create encoding for the current image'}), 400
         
-        current_face_encoding = current_face_encodings[0] # Ambil encoding pertama
+        current_face_encoding = current_face_encodings[0]
 
-        # === LOGIKA BARU: Ambil data wajah dari Database ===
+        # Ambil data wajah dari Database
         conn = get_db_connection()
         if conn is None:
             return jsonify({'error': 'Flask: Could not connect to database for attendance.'}), 503
@@ -83,14 +76,11 @@ def attendance():
         known_names_from_db = []
 
         try:
-            # Ambil NIP, nama, dan face_embedding dari tabel Karyawan
-            # Pastikan nama tabel "Karyawan" dan kolom "face_embedding" sudah benar
             cursor.execute("SELECT nip, nama, face_embedding FROM \"Karyawan\" WHERE face_embedding IS NOT NULL")
             all_karyawan_with_embeddings = cursor.fetchall()
 
             for row in all_karyawan_with_embeddings:
                 try:
-                    # Konversi string encoding dari DB kembali ke numpy array
                     str_encoding = row['face_embedding']
                     float_list = [float(x) for x in str_encoding.strip('[]').split(',')]
                     known_face_encodings_from_db.append(np.array(float_list))
@@ -116,8 +106,6 @@ def attendance():
                     'message': 'Face recognized',
                     'name': known_names_from_db[best_match_index],
                     'nip': known_nips_from_db[best_match_index]
-                    # Timestamp akan dibuat oleh Next.js saat mencatat absensi
-                    # 'image' (gambar asli) tidak perlu dikembalikan lagi ke Next.js dari sini
                 }), 200
             else:
                 return jsonify({'error': 'Face not recognized'}), 404
@@ -134,87 +122,101 @@ def attendance():
         app.logger.error(f"Flask: Error in /attendance endpoint: {str(e)}")
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500
 
-# --- Endpoint pendaftaran wajah (sekarang mengupdate DB) ---
+# --- Endpoint pendaftaran wajah ---
 @app.route('/register-face', methods=['POST'])
 def register_face():
     data = request.get_json()
 
-    # Next.js akan mengirim NIP, nama (opsional), dan fotoWajah
     if not data or 'nip' not in data or 'fotoWajah' not in data:
-        return jsonify({'error': 'Data tidak lengkap dari Next.js: nip dan fotoWajah wajib diisi'}), 400
+        return jsonify({'error': 'Data tidak lengkap: nip dan fotoWajah wajib diisi'}), 400
 
     try:
-        nip_karyawan = data['nip']
-        # nama_karyawan = data.get('nama', 'Unknown') # Bisa diambil untuk logging
         image_b64_data_url = data['fotoWajah']
 
         if ',' not in image_b64_data_url:
             return jsonify({'error': 'Format data URL gambar tidak valid'}), 400
 
         header, image_b64 = image_b64_data_url.split(',', 1)
-        # file_extension = '.jpg' if 'image/jpeg' in header else '.png' # Tidak perlu simpan file di Flask
-
         image_data = base64.b64decode(image_b64)
         np_arr = np.frombuffer(image_data, np.uint8)
         image_cv2 = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
         if image_cv2 is None:
-            return jsonify({'error': 'Data gambar tidak valid setelah decode (Flask)'}), 400
+            return jsonify({'error': 'Gagal decode gambar (Flask)'}), 400
 
         face_locations = face_recognition.face_locations(image_cv2)
         if not face_locations:
             return jsonify({'error': 'Tidak ada wajah terdeteksi (Flask)'}), 400
         if len(face_locations) > 1:
-             return jsonify({'error': 'Terdeteksi lebih dari satu wajah. Harap pastikan hanya satu wajah di foto.'}), 400
+            return jsonify({'error': 'Terdeteksi lebih dari satu wajah. Harap gunakan foto satu wajah.'}), 400
 
+        # Dapatkan face encoding
         face_encoding_array = face_recognition.face_encodings(image_cv2, face_locations)[0]
-        face_encoding_list_of_python_floats = [float(val) for val in face_encoding_array]
-        face_encoding_str = str(face_encoding_list_of_python_floats) 
+        face_encoding_list = [float(val) for val in face_encoding_array]
 
-        # === LOGIKA BARU: Simpan/Update encoding ke Database ===
-        conn = get_db_connection()
-        if conn is None:
-            return jsonify({'error': 'Flask: Could not connect to database for registration.'}), 503
-        
-        cursor = conn.cursor()
-        try:
-            # Update kolom face_embedding di tabel Karyawan untuk NIP yang sesuai
-            # Pastikan tabel "Karyawan" dan kolom "face_embedding" sudah ada
-            cursor.execute(
-                """
-                UPDATE "Karyawan" 
-                SET face_embedding = %s, "updatedAt" = %s 
-                WHERE nip = %s
-                RETURNING nama 
-                """,
-                (face_encoding_str, datetime.now(), nip_karyawan)
-            )
-            updated_info = cursor.fetchone()
-            conn.commit()
-
-            if updated_info:
-                k_nama = updated_info[0]
-                app.logger.info(f"Flask: Face encoding untuk NIP {nip_karyawan} ({k_nama}) berhasil disimpan/diupdate ke DB.")
-                return jsonify({'message': f'Face encoding untuk {k_nama} (NIP: {nip_karyawan}) berhasil diproses dan disimpan.'}), 200 # 200 OK untuk update
-            else:
-                # Ini berarti NIP yang dikirim Next.js tidak ditemukan di tabel Karyawan.
-                # Alur di Next.js seharusnya sudah membuat record Karyawan terlebih dahulu.
-                app.logger.warning(f"Flask: Karyawan dengan NIP {nip_karyawan} tidak ditemukan di DB saat mencoba update face_embedding.")
-                return jsonify({'error': f'Karyawan dengan NIP {nip_karyawan} tidak ditemukan di database untuk diupdate.'}), 404
-        
-        except psycopg2.Error as db_err:
-            conn.rollback()
-            app.logger.error(f"Flask: Database error saat update face_embedding: {str(db_err)}")
-            return jsonify({'error': f'Flask Database error: {str(db_err)}'}), 500
-        finally:
-            if conn:
-                cursor.close()
-                conn.close()
+        return jsonify({
+            'face_encoding': face_encoding_list,
+            'message': 'Wajah berhasil dikenali dan diencode'
+        }), 200
 
     except Exception as e:
-        app.logger.error(f"Flask: Error di endpoint /register-face: {str(e)}")
-        return jsonify({'error': f'Flask: Terjadi kesalahan server internal: {str(e)}'}), 500
+        app.logger.error(f"Flask error di /register-face: {str(e)}")
+        return jsonify({'error': f'Flask error: {str(e)}'}), 500
+
+# --- Endpoint Login ---
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    email = data.get('email')
+    password = data.get('password')
+
+    # Admin hardcoded
+    if email == 'admin@example.com' and password == 'admin123':
+        return jsonify({"message": "Login berhasil", "role": "admin"}), 200
+
+    conn = get_db_connection()
+    if conn is None:
+        return jsonify({"error": "Tidak bisa konek ke database"}), 503
+
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT nama, password FROM public."Karyawan"
+            WHERE email = %s
+        """, (email,))
+        row = cursor.fetchone()
+
+        if row:
+            nama, hashed_password = row
+
+            if bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8')):
+                return jsonify({
+                    "message": "Login berhasil",
+                    "role": "user",
+                    "nama": nama
+                }), 200
+            else:
+                return jsonify({"message": "Email atau password salah"}), 401
+        else:
+            return jsonify({"message": "Email atau password salah"}), 401
+
+    except psycopg2.Error as db_err:
+        return jsonify({"error": f"Database error: {str(db_err)}"}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+# --- Health check endpoint ---
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({'status': 'OK', 'message': 'Flask server is running'}), 200
 
 # --- Jalankan server ---
-if __name__ == '__main__': # Menggunakan __name__ standar Flask
+if __name__ == '__main__':
+    print("Starting Flask server...")
+    print("Available endpoints:")
+    print("- POST /attendance - Face recognition attendance")
+    print("- POST /register-face - Register new face")
+    print("- POST /api/login - User login")
+    print("- GET /health - Health check")
     app.run(host='0.0.0.0', port=5000, debug=True)
