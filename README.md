@@ -1,6 +1,6 @@
 # Face Recognition Project
 
-Sistem absensi berbasis pengenalan wajah dengan teknologi full-stack menggunakan React.js, Python Flask, dan PostgreSQL.
+Sistem absensi berbasis pengenalan wajah dengan teknologi full-stack menggunakan Nextjs, Python Flask, dan PostgreSQL.
 
 ## Prerequisites
 
