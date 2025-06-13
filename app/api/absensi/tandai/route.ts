@@ -5,15 +5,43 @@ import { AttendanceResponse } from '@/lib/api';
 export const dynamic = 'force-dynamic';
 
 const FLASK_ATTENDANCE_URL = 'http://localhost:5000/attendance';
+const OFFICE_LAT = 3.54161111
+const OFFICE_LNG = 98.67988889
+const MAX_DISTANCE_METERS = 100
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { image: imageData } = body;
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000 // Earth radius in meters
+  const dLat = (lat2 - lat1) * (Math.PI / 180)
+  const dLon = (lon2 - lon1) * (Math.PI / 180)
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) *
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
+}
 
-    if (!imageData) {
-      return NextResponse.json({ success: false, message: 'Data gambar diperlukan.' }, { status: 400 });
-    }
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ message: "Metode tidak diizinkan" })
+  }
+
+  const { image, latitude, longitude } = req.body
+
+  if (!image || typeof latitude !== "number" || typeof longitude !== "number") {
+    return res.status(400).json({ message: "Data tidak lengkap: foto dan lokasi wajib diisi" })
+  }
+
+  const distance = calculateDistance(latitude, longitude, OFFICE_LAT, OFFICE_LNG)
+
+  if (distance > MAX_DISTANCE_METERS) {
+    return res.status(403).json({
+      message: `Lokasi di luar jangkauan absensi (${Math.round(distance)} meter dari kantor)`,
+    })
+  }
+}
+
 
     // 1. Panggil Flask
     let flaskResponse;

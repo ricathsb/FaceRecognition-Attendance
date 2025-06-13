@@ -66,12 +66,16 @@ export async function registerAccount(
 /**
  * Fungsi untuk menandai absensi melalui API route Next.js.
  */
-export async function markAttendance(imageData: string): Promise<AttendanceResponse> {
+export async function markAttendance(
+  imageData: string,
+  latitude?: number,
+  longitude?: number
+): Promise<AttendanceResponse> {
   try {
     const response = await fetch("/api/absensi/tandai", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image: imageData }),
+      body: JSON.stringify({ image: imageData, latitude, longitude }),
     })
 
     const data = await response.json()

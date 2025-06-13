@@ -13,88 +13,114 @@ export function AttendanceForm({ onSuccess, onError, onLoading }: AttendanceForm
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [captureStatus, setCaptureStatus] = useState<"idle" | "capturing" | "processing">("idle")
   const { toast } = useToast()
+  function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000 // Earth radius in meters
+  const dLat = (lat2 - lat1) * (Math.PI / 180)
+  const dLon = (lon2 - lon1) * (Math.PI / 180)
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) *
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c // Distance in meters
+}
+
 
   const handleCapture = async (imageSrc: string | null) => {
-    if (!imageSrc) {
-      toast({
-        title: "Gagal Mengambil Foto",
-        description: "Tidak dapat mengambil gambar. Silakan coba lagi.",
-        variant: "destructive",
-      })
-      onError("Gagal mengambil foto. Silakan coba lagi.")
-      return
-    }
-
-    try {
-      setIsSubmitting(true)
-      setCaptureStatus("processing")
-      onLoading(true)
-
-      // Show processing toast
-      toast({
-        title: "Memproses Absensi",
-        description: "Sedang memverifikasi identitas karyawan dan mencatat kehadiran...",
-        duration: 2000,
-      })
-
-      // imageSrc sudah berformat data URL: 'data:image/jpeg;base64,...'
-      // Jadi kita bisa langsung kirim imageSrc sebagai string lengkap
-      const response = await markAttendance(imageSrc)
-
-      if (response.success) {
-        // Success toast
-        toast({
-          title: "Absensi Berhasil! ✨",
-          description: `Selamat datang, ${response.nama || "Karyawan"}!`,
-          variant: "default",
-          duration: 5000,
-        })
-
-        onSuccess({
-          success: true,
-          nip: response.nip || "",
-          nama: response.nama || "",
-          timestamp: response.timestamp || new Date().toISOString(),
-          message: response.message || "Absensi berhasil dicatat!",
-          image: imageSrc, // Include the captured image
-        })
-
-        setCaptureStatus("idle")
-      } else {
-        throw new Error(response.message || "Gagal mencatat absensi")
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Terjadi kesalahan yang tidak terduga"
-
-      // Error toast with more specific messaging
-      let toastTitle = "Gagal Mencatat Absensi"
-      let toastDescription = errorMessage
-
-      if (errorMessage.toLowerCase().includes("wajah")) {
-        toastTitle = "Wajah Tidak Terdeteksi"
-        toastDescription = "Pastikan wajah Anda terlihat jelas dan coba lagi."
-      } else if (errorMessage.toLowerCase().includes("network") || errorMessage.toLowerCase().includes("connection")) {
-        toastTitle = "Masalah Koneksi"
-        toastDescription = "Periksa koneksi internet Anda dan coba lagi."
-      } else if (errorMessage.toLowerCase().includes("server")) {
-        toastTitle = "Server Error"
-        toastDescription = "Terjadi masalah pada server. Silakan coba beberapa saat lagi."
-      }
-
-      toast({
-        title: toastTitle,
-        description: toastDescription,
-        variant: "destructive",
-        duration: 6000,
-      })
-
-      onError(errorMessage)
-      setCaptureStatus("idle")
-    } finally {
-      setIsSubmitting(false)
-      onLoading(false)
-    }
+  if (!imageSrc) {
+    toast({
+      title: "Gagal Mengambil Foto",
+      description: "Tidak dapat mengambil gambar. Silakan coba lagi.",
+      variant: "destructive",
+    })
+    onError("Gagal mengambil foto. Silakan coba lagi.")
+    return
   }
+
+  setIsSubmitting(true)
+  setCaptureStatus("processing")
+  onLoading(true)
+
+  toast({
+    title: "Memproses Absensi",
+    description: "Sedang memverifikasi identitas dan lokasi...",
+    duration: 2000,
+  })
+
+  // Lokasi kantor
+  const officeLat = 3.54161111
+  const officeLng = 98.67988889
+  const maxDistanceMeters = 100
+
+  try {
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords
+
+        const distance = calculateDistance(latitude, longitude, officeLat, officeLng)
+
+        if (distance > maxDistanceMeters) {
+          toast({
+            title: "Di Luar Area Kantor",
+            description: `Absensi hanya bisa dilakukan dalam radius ${maxDistanceMeters} meter dari kantor.`,
+            variant: "destructive",
+            duration: 6000,
+          })
+          onError("Lokasi di luar radius kantor.")
+          setIsSubmitting(false)
+          setCaptureStatus("idle")
+          onLoading(false)
+          return
+        }
+
+        const response = await markAttendance(imageSrc, latitude, longitude)
+
+        if (response.success) {
+          toast({
+            title: "Absensi Berhasil! ✨",
+            description: `Selamat datang, ${response.nama || "Karyawan"}!`,
+            variant: "default",
+            duration: 5000,
+          })
+
+          onSuccess({
+            success: true,
+            nip: response.nip || "",
+            nama: response.nama || "",
+            timestamp: response.timestamp || new Date().toISOString(),
+            message: response.message || "Absensi berhasil dicatat!",
+            image: imageSrc,
+          })
+        } else {
+          throw new Error(response.message || "Gagal mencatat absensi")
+        }
+      },
+      (err) => {
+        toast({
+          title: "Gagal Mengakses Lokasi",
+          description: "Izinkan akses lokasi untuk melakukan absensi.",
+          variant: "destructive",
+        })
+        onError("Gagal mendapatkan lokasi.")
+        setIsSubmitting(false)
+        setCaptureStatus("idle")
+        onLoading(false)
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  } catch (error) {
+    toast({
+      title: "Kesalahan Umum",
+      description: "Terjadi kesalahan saat memproses absensi.",
+      variant: "destructive",
+    })
+    onError("Terjadi kesalahan saat absensi.")
+    setIsSubmitting(false)
+    setCaptureStatus("idle")
+    onLoading(false)
+  }
+}
 
   return (
     <div className="w-full space-y-6">
