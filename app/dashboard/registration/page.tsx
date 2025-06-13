@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useRef, useCallback } from "react"
-import { Camera, Save, X, Loader2, RotateCcw, User, Mail, Lock, BadgeIcon, CheckCircle, UserPlus } from "lucide-react"
+import { Camera, Save, X, Loader2, RotateCcw, User, Mail, Lock, BadgeIcon, CheckCircle, UserPlus, Users } from "lucide-react"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 
 interface FormData {
@@ -10,6 +10,7 @@ interface FormData {
     nip: string
     email: string
     password: string
+    status: string
 }
 
 export default function RegistrationPage() {
@@ -18,6 +19,7 @@ export default function RegistrationPage() {
         nip: "",
         email: "",
         password: "",
+        status: "Staff",
     })
 
     const [currentStep, setCurrentStep] = useState(1)
@@ -30,7 +32,7 @@ export default function RegistrationPage() {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const [isCameraActive, setIsCameraActive] = useState(false)
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target
 
         setFormData((prev) => {
@@ -108,9 +110,10 @@ export default function RegistrationPage() {
             nip: formData.nip?.trim() || "",
             email: formData.email?.trim() || "",
             password: formData.password?.trim() || "",
+            status: formData.status?.trim() || "",
         }
 
-        if (!trimmedData.nama || !trimmedData.nip || !trimmedData.email || !trimmedData.password) {
+        if (!trimmedData.nama || !trimmedData.nip || !trimmedData.email || !trimmedData.password || !trimmedData.status) {
             setSubmitMessage("Semua field wajib diisi")
             return false
         }
@@ -134,6 +137,12 @@ export default function RegistrationPage() {
             return false
         }
 
+        // Validasi status
+        if (!["Staff", "Teacher"].includes(trimmedData.status)) {
+            setSubmitMessage("Status harus berupa 'Staff' atau 'Teacher'")
+            return false
+        }
+
         setIsNipValid(true)
         return true
     }
@@ -145,6 +154,7 @@ export default function RegistrationPage() {
             nip: formData.nip?.trim() || "",
             email: formData.email?.trim() || "",
             password: formData.password?.trim() || "",
+            status: formData.status?.trim() || "",
         }
 
         const isValid =
@@ -152,9 +162,11 @@ export default function RegistrationPage() {
             trimmedData.nip &&
             trimmedData.email &&
             trimmedData.password &&
+            trimmedData.status &&
             trimmedData.password.length >= 6 &&
             /^\d{5,12}$/.test(trimmedData.nip) &&
-            /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedData.email)
+            /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedData.email) &&
+            ["Staff", "Teacher"].includes(trimmedData.status)
 
         return isValid
     }
@@ -181,6 +193,7 @@ export default function RegistrationPage() {
                 nip: formData.nip || "",
                 email: formData.email || "",
                 password: formData.password || "",
+                status: formData.status || "Staff",
                 fotoWajah: imageSrc || "",
             }
 
@@ -214,6 +227,7 @@ export default function RegistrationPage() {
                     nip: "",
                     email: "",
                     password: "",
+                    status: "Staff",
                 })
                 setImageSrc(null)
                 setCurrentStep(1)
@@ -226,6 +240,16 @@ export default function RegistrationPage() {
         } finally {
             setIsSubmitting(false)
         }
+    }
+
+    const getStatusIcon = (status: string) => {
+        return status === "Teacher" ? "👨‍🏫" : "👨‍💼"
+    }
+
+    const getStatusColor = (status: string) => {
+        return status === "Teacher" 
+            ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
+            : "bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800"
     }
 
     return (
@@ -382,6 +406,39 @@ export default function RegistrationPage() {
                                         </p>
                                     )}
                                 </div>
+
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
+                                    <div className="relative">
+                                        <Users className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                                        <select
+                                            name="status"
+                                            value={formData.status || "Staff"}
+                                            onChange={handleInputChange}
+                                            className="w-full pl-12 pr-4 py-3.5 border border-emerald-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200 appearance-none"
+                                            required
+                                        >
+                                            <option value="Staff">Staff</option>
+                                            <option value="Teacher">Teacher</option>
+                                        </select>
+                                        {formData.status && (
+                                            <div className="absolute right-12 top-1/2 transform -translate-y-1/2">
+                                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(formData.status)}`}>
+                                                    <span className="mr-1">{getStatusIcon(formData.status)}</span>
+                                                    {formData.status}
+                                                </span>
+                                            </div>
+                                        )}
+                                        <div className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        Pilih status karyawan: Staff untuk pegawai administrasi, Teacher untuk tenaga pengajar
+                                    </p>
+                                </div>
                             </div>
 
                             {submitMessage && currentStep === 1 && (
@@ -412,39 +469,68 @@ export default function RegistrationPage() {
                             <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-8">Pengambilan Foto Wajah</h2>
 
                             <div className="space-y-8">
-                                {/* Camera Instructions */}
+                                {/* Employee Info Summary */}
                                 <div className="bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-5">
                                     <h3 className="font-medium text-emerald-900 dark:text-emerald-300 mb-3 flex items-center">
+                                        <User className="h-5 w-5 mr-2" />
+                                        Ringkasan Data Karyawan
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                        <div>
+                                            <span className="text-emerald-700 dark:text-emerald-300 font-medium">Nama:</span>
+                                            <span className="ml-2 text-emerald-800 dark:text-emerald-200">{formData.nama}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-emerald-700 dark:text-emerald-300 font-medium">NIP:</span>
+                                            <span className="ml-2 text-emerald-800 dark:text-emerald-200">{formData.nip}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-emerald-700 dark:text-emerald-300 font-medium">Email:</span>
+                                            <span className="ml-2 text-emerald-800 dark:text-emerald-200">{formData.email}</span>
+                                        </div>
+                                        <div className="flex items-center">
+                                            <span className="text-emerald-700 dark:text-emerald-300 font-medium">Status:</span>
+                                            <span className={`ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(formData.status)}`}>
+                                                <span className="mr-1">{getStatusIcon(formData.status)}</span>
+                                                {formData.status}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Camera Instructions */}
+                                <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-xl p-5">
+                                    <h3 className="font-medium text-blue-900 dark:text-blue-300 mb-3 flex items-center">
                                         <Camera className="h-5 w-5 mr-2" />
                                         Panduan Pengambilan Foto
                                     </h3>
-                                    <ul className="text-sm text-emerald-700 dark:text-emerald-300 space-y-2 pl-2">
+                                    <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-2 pl-2">
                                         <li className="flex items-start">
-                                            <span className="inline-block w-4 h-4 mr-2 rounded-full bg-emerald-600 text-white text-xs flex items-center justify-center mt-0.5">
+                                            <span className="inline-block w-4 h-4 mr-2 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center mt-0.5">
                                                 •
                                             </span>
                                             Pastikan wajah terlihat jelas dan tidak tertutup
                                         </li>
                                         <li className="flex items-start">
-                                            <span className="inline-block w-4 h-4 mr-2 rounded-full bg-emerald-600 text-white text-xs flex items-center justify-center mt-0.5">
+                                            <span className="inline-block w-4 h-4 mr-2 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center mt-0.5">
                                                 •
                                             </span>
                                             Posisikan wajah di tengah frame
                                         </li>
                                         <li className="flex items-start">
-                                            <span className="inline-block w-4 h-4 mr-2 rounded-full bg-emerald-600 text-white text-xs flex items-center justify-center mt-0.5">
+                                            <span className="inline-block w-4 h-4 mr-2 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center mt-0.5">
                                                 •
                                             </span>
                                             Pastikan pencahayaan cukup terang
                                         </li>
                                         <li className="flex items-start">
-                                            <span className="inline-block w-4 h-4 mr-2 rounded-full bg-emerald-600 text-white text-xs flex items-center justify-center mt-0.5">
+                                            <span className="inline-block w-4 h-4 mr-2 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center mt-0.5">
                                                 •
                                             </span>
                                             Hindari bayangan pada wajah
                                         </li>
                                         <li className="flex items-start">
-                                            <span className="inline-block w-4 h-4 mr-2 rounded-full bg-emerald-600 text-white text-xs flex items-center justify-center mt-0.5">
+                                            <span className="inline-block w-4 h-4 mr-2 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center mt-0.5">
                                                 •
                                             </span>
                                             Lepas kacamata atau masker jika memungkinkan
