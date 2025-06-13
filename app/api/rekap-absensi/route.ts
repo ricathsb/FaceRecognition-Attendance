@@ -53,42 +53,74 @@ export async function GET(req: Request) {
 
     console.log("[INFO] Absensi ditemukan:", data.length);
 
-    // Path ke font
-    const fontPath = path.resolve(process.cwd(), "public", "fonts", "Roboto-Regular.ttf");
+    // === Embed font langsung ===
+    const fontRegularPath = path.resolve(process.cwd(), "public", "fonts", "Roboto-Regular.ttf");
+    const fontBoldPath = path.resolve(process.cwd(), "public", "fonts", "Roboto-Bold.ttf");
 
-    if (!fs.existsSync(fontPath)) {
-      console.error("[ERROR] Font tidak ditemukan:", fontPath);
-      return NextResponse.json({ error: "Font PDF tidak ditemukan di server." }, { status: 500 });
+    if (!fs.existsSync(fontRegularPath) || !fs.existsSync(fontBoldPath)) {
+      console.error("[ERROR] Font tidak ditemukan di direktori public/fonts/");
+      return NextResponse.json({ error: "Font PDF tidak ditemukan." }, { status: 500 });
     }
 
-    // Buat dokumen PDF dengan font default langsung di-override
     const doc = new PDFDocument({
       margin: 40,
       size: "A4",
-      font: fontPath, // <<< Ini mencegah error Helvetica.afm
+      font: fontRegularPath, // hindari default Helvetica
     });
 
-    const bufferChunks: Uint8Array[] = [];
+    // Register bold font
+    doc.registerFont("regular", fontRegularPath);
+    doc.registerFont("bold", fontBoldPath);
 
+    const bufferChunks: Uint8Array[] = [];
     doc.on("data", (chunk) => bufferChunks.push(chunk));
     const done = new Promise<Buffer>((resolve, reject) => {
       doc.on("end", () => resolve(Buffer.concat(bufferChunks)));
-      doc.on("error", (err) => reject(err));
+      doc.on("error", reject);
     });
 
-    // Mulai isi konten PDF
-    doc.fontSize(18).text("Rekap Absensi", { align: "center" });
+    // === PDF UI ===
+    doc.font("bold").fontSize(16).text(`Rekap Absensi MAS AI Ittihadiyah Bulan ${dayjs(start).format("MMMM YYYY")}`, { align: "center" });
     doc.moveDown();
 
-    doc.fontSize(12);
+    // Header Tabel
+    const tableTop = doc.y + 10;
+    const colWidths = [30, 140, 100, 100, 150]; // no, nama, nip, status, waktu
+
+    const drawRow = (y: number, columns: string[], isHeader = false) => {
+      const font = isHeader ? "bold" : "regular";
+      const fontSize = isHeader ? 10 : 9;
+
+      doc.font(font).fontSize(fontSize);
+      let x = doc.page.margins.left;
+
+      columns.forEach((text, i) => {
+        doc.text(text, x, y, {
+          width: colWidths[i],
+          align: "left",
+        });
+        x += colWidths[i];
+      });
+    };
+
+    // Tabel Header
+    drawRow(tableTop, ["No", "Nama", "NIP", "Status", "Waktu & Status"], true);
+
+    let rowY = tableTop + 20;
+
     data.forEach((item, index) => {
-      doc.text(`${index + 1}. ${item.karyawan.nama} (${item.karyawan.nip}) - ${item.karyawan.status}`);
-      doc.text(`   Waktu: ${dayjs(item.timestamp_absensi).tz("Asia/Jakarta").format("DD MMM YYYY HH:mm")} | Status: ${item.status}`);
-      doc.moveDown(0.5);
+      const waktu = dayjs(item.timestamp_absensi).tz("Asia/Jakarta").format("DD MMM YYYY HH:mm");
+      drawRow(rowY, [
+        String(index + 1),
+        item.karyawan.nama,
+        item.karyawan.nip,
+        item.karyawan.status,
+        `${waktu} | ${item.status}`,
+      ]);
+      rowY += 20;
     });
 
     doc.end();
-
     const pdfBuffer = await done;
 
     return new Response(pdfBuffer, {
@@ -99,6 +131,6 @@ export async function GET(req: Request) {
     });
   } catch (err) {
     console.error("[ERROR] Gagal generate PDF:", err);
-    return NextResponse.json({ error: "Gagal membuat PDF" }, { status: 500 });
+    return NextResponse.json({ error: "Gagal membuat PDF." }, { status: 500 });
   }
 }

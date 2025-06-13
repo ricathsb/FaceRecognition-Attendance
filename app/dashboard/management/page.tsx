@@ -306,7 +306,7 @@ export default function ManagementPage() {
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `rekap-absensi-${selectedMonth}-${selectedYear}.pdf`
+    a.download = `AI Ittihadiyah-rekap-absensi-${selectedMonth}-${selectedYear}.pdf`
     a.click()
     window.URL.revokeObjectURL(url)
   } catch (error) {
