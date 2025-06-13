@@ -158,7 +158,7 @@ export default function LoginPage() {
                         </div>
                     </div>
 
-
+                    {/* block samping kanan */}
                     <div className="hidden lg:block lg:w-1/2 relative bg-gradient-to-br from-emerald-600 to-teal-700 overflow-hidden">
                         <div className="absolute inset-0 opacity-5">
                             <div className="absolute top-0 left-0 w-full h-full">
