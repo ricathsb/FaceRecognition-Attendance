@@ -4,8 +4,8 @@ import fs from "fs/promises"
 import path from "path"
 import bcrypt from "bcrypt"
 
-const FLASK_REGISTER_FACE_URL = process.env.FLASK_BACKEND_URL
-  ? `${process.env.FLASK_BACKEND_URL}/register-face`
+const FLASK_REGISTER_FACE_URL = process.env.NEXT_PUBLIC_BASE_URL
+  ? `${process.env.NEXT_PUBLIC_BASE_URL}/register-face`
   : "http://localhost:5000/register-face"
 
 export const dynamic = "force-dynamic"

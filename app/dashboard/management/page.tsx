@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef, useCallback } from "react"
+import React, { useEffect, useState, useRef, useCallback } from "react"
 import {
   Search,
   Save,
@@ -12,6 +12,7 @@ import {
   ChevronRight,
   RefreshCw,
   Calendar,
+  Edit,
 } from "lucide-react"
 import MonthSelector from "@/components/month-selector"
 import { getManagementData } from "@/lib/api"
@@ -20,7 +21,11 @@ type Employee = {
   id: string
   name: string
   nip: string
+  email?: string
   attendance: {
+    [tanggal: string]: string
+  }
+  checkoutAttendance: {
     [tanggal: string]: string
   }
   summary: string
@@ -36,6 +41,8 @@ type AttendanceSettings = {
   checkInStartTime: string
   onTimeBeforeHour: string
   lateBeforeHour: string
+  checkOutStartTime: string
+  checkOutEndTime: string
   workDays: string[]
 }
 
@@ -95,7 +102,19 @@ export default function ManagementPage() {
     checkInStartTime: "07:00",
     onTimeBeforeHour: "09:00",
     lateBeforeHour: "14:00",
+    checkOutStartTime: "16:00",
+    checkOutEndTime: "18:00",
     workDays: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday"],
+  })
+
+  // Add employee editing states
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [employeeForm, setEmployeeForm] = useState({
+    name: "",
+    nip: "",
+    email: "",
+    password: "",
   })
 
   // Tambahkan state untuk holiday management
@@ -165,6 +184,53 @@ export default function ManagementPage() {
     return "Belum Ada Data"
   }
 
+  // Add after getAttendanceTooltip function
+  const getCheckoutAttendanceColor = (status: string) => {
+    if (status === "pulang") return "bg-blue-500"
+
+    // Ikuti logic yang sama dengan kolom masuk
+    const presentStatuses = ["hadir", "tepat waktu"]
+    if (presentStatuses.includes(status)) return "bg-green-500"
+    if (status === "terlambat") return "bg-yellow-500"
+    if (status === "absen") return "bg-red-500"
+    if (status === "sabtu") return "bg-green-600"
+    if (status === "minggu") return "bg-purple-500"
+    if (status === "libur") return "bg-orange-500"
+    return "bg-gray-300"
+  }
+
+  const getCheckoutAttendanceText = (status: string) => {
+    if (status === "pulang") return "P"
+
+    // Tampilkan strip untuk status hari libur/minggu/sabtu
+    const presentStatuses = ["hadir", "tepat waktu"]
+    if (presentStatuses.includes(status)) return "-"
+    if (status === "terlambat") return "-"
+    if (status === "absen") return "-"
+    if (status === "sabtu") return "-"
+    if (status === "minggu") return "-"
+    if (status === "libur") return "-"
+    return ""
+  }
+
+  const getCheckoutAttendanceTooltip = (status: string, dateStr?: string) => {
+    if (status === "pulang") return "Sudah Pulang"
+
+    // Ikuti logic tooltip yang sama dengan kolom masuk
+    if (status === "libur" && dateStr) {
+      const holidayInfo = getHolidayInfo(dateStr)
+      return holidayInfo ? `Hari Libur: ${holidayInfo.keterangan}` : "Hari Libur Khusus"
+    }
+
+    const presentStatuses = ["hadir", "tepat waktu"]
+    if (presentStatuses.includes(status)) return "Belum Absen Pulang"
+    if (status === "terlambat") return "Belum Absen Pulang"
+    if (status === "absen") return "Tidak Hadir"
+    if (status === "sabtu") return "Hari Kerja Sabtu"
+    if (status === "minggu") return "Minggu (Libur)"
+    return "Belum Ada Data"
+  }
+
   const isHoliday = (dateStr: string) => {
     return holidays.some((holiday) => {
       const holidayDate = new Date(holiday.tanggal).toISOString().split("T")[0]
@@ -184,7 +250,11 @@ export default function ManagementPage() {
   const isWithinCheckInTime = () => {
     const now = new Date()
     const currentTime = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`
-    return currentTime >= attendanceSettings.checkInStartTime && currentTime <= attendanceSettings.lateBeforeHour
+    const isCheckInTime =
+      currentTime >= attendanceSettings.checkInStartTime && currentTime <= attendanceSettings.lateBeforeHour
+    const isCheckOutTime =
+      currentTime >= attendanceSettings.checkOutStartTime && currentTime <= attendanceSettings.checkOutEndTime
+    return isCheckInTime || isCheckOutTime
   }
 
   // Holiday management functions
@@ -298,22 +368,90 @@ export default function ManagementPage() {
   }
 
   const downloadPDF = async () => {
-  try {
-    const res = await fetch(`/api/rekap-absensi?month=${selectedMonth}&year=${selectedYear}`)
-    if (!res.ok) throw new Error("Gagal mengunduh PDF")
+    try {
+      const res = await fetch(`/api/rekap-absensi?month=${selectedMonth}&year=${selectedYear}`)
 
-    const blob = await res.blob()
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `AI Ittihadiyah-rekap-absensi-${selectedMonth}-${selectedYear}.pdf`
-    a.click()
-    window.URL.revokeObjectURL(url)
-  } catch (error) {
-    console.error("Download gagal:", error)
-    alert("Gagal mengunduh PDF rekap absensi.")
+      if (!res.ok) {
+        let errorMessage = "Gagal mengunduh PDF"
+
+        try {
+          const contentType = res.headers.get("content-type")
+          if (contentType && contentType.includes("application/json")) {
+            const errorData = await res.json()
+            errorMessage = errorData.error || errorMessage
+          } else {
+            const text = await res.text()
+            errorMessage = text || errorMessage
+          }
+        } catch (parseErr) {
+          console.warn("Gagal parse respons error:", parseErr)
+        }
+
+        throw new Error(errorMessage)
+      }
+
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `AI Ittihadiyah-rekap-absensi-${selectedMonth}-${selectedYear}.pdf`
+      a.click()
+      window.URL.revokeObjectURL(url)
+    } catch (error: any) {
+      console.error("Download gagal:", error)
+      alert(error.message || "Gagal mengunduh PDF rekap absensi.")
+    }
   }
-}
+
+  const resetEmployeeForm = () => {
+    setEmployeeForm({ name: "", nip: "", email: "", password: "" })
+    setIsEditModalOpen(false)
+    setEditingEmployee(null)
+  }
+
+  const startEditEmployee = (employee: Employee) => {
+    setEditingEmployee(employee)
+    setEmployeeForm({
+      name: employee.name,
+      nip: employee.nip,
+      email: employee.email || "",
+      password: "",
+    })
+    setIsEditModalOpen(true)
+  }
+
+  const handleEditEmployee = async () => {
+    if (!employeeForm.name.trim() || !employeeForm.nip.trim()) {
+      alert("Nama dan NIP harus diisi")
+      return
+    }
+
+    try {
+      const response = await fetch("/api/karyawan/editKaryawan", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingEmployee?.id,
+          name: employeeForm.name.trim(),
+          nip: employeeForm.nip.trim(),
+          email: employeeForm.email.trim(),
+          ...(employeeForm.password && { password: employeeForm.password }),
+        }),
+      })
+
+      if (response.ok) {
+        await fetchEmployeesAndSettings(true)
+        resetEmployeeForm()
+        alert("Data karyawan berhasil diperbarui")
+      } else {
+        const errorData = await response.json().catch(() => ({ message: "Gagal memperbarui data karyawan" }))
+        alert(errorData.message || "Gagal memperbarui data karyawan")
+      }
+    } catch (error) {
+      console.error("Error updating employee:", error)
+      alert("Terjadi kesalahan saat memperbarui data karyawan")
+    }
+  }
 
   const getHolidayInfo = (dateStr: string) => {
     return holidays.find((holiday) => {
@@ -381,14 +519,26 @@ export default function ManagementPage() {
     const checkInStart = new Date(`2000-01-01T${attendanceSettings.checkInStartTime}:00`)
     const onTimeBefore = new Date(`2000-01-01T${attendanceSettings.onTimeBeforeHour}:00`)
     const lateBefore = new Date(`2000-01-01T${attendanceSettings.lateBeforeHour}:00`)
+    const checkOutStart = new Date(`2000-01-01T${attendanceSettings.checkOutStartTime}:00`)
+    const checkOutEnd = new Date(`2000-01-01T${attendanceSettings.checkOutEndTime}:00`)
 
     if (onTimeBefore <= checkInStart) {
-      alert("Batas waktu tepat waktu harus lebih besar dari waktu mulai absen")
+      alert("Batas waktu tepat waktu harus lebih besar dari waktu mulai absen masuk")
       return
     }
 
     if (lateBefore <= onTimeBefore) {
       alert("Batas waktu terlambat harus lebih besar dari batas waktu tepat waktu")
+      return
+    }
+
+    if (checkOutStart <= lateBefore) {
+      alert("Waktu mulai absen pulang harus lebih besar dari batas waktu terlambat masuk")
+      return
+    }
+
+    if (checkOutEnd <= checkOutStart) {
+      alert("Batas waktu absen pulang harus lebih besar dari waktu mulai absen pulang")
       return
     }
 
@@ -455,6 +605,8 @@ export default function ManagementPage() {
             checkInStartTime: cachedData.attendanceSettings.waktuMulaiAbsen ?? "07:00",
             onTimeBeforeHour: cachedData.attendanceSettings.batasTepatWaktu ?? "09:00",
             lateBeforeHour: cachedData.attendanceSettings.batasTerlambat ?? "14:00",
+            checkOutStartTime: cachedData.attendanceSettings.waktuMulaiPulang ?? "16:00",
+            checkOutEndTime: cachedData.attendanceSettings.batasWaktuPulang ?? "18:00",
             workDays: cachedData.attendanceSettings.hariKerja ?? [
               "monday",
               "tuesday",
@@ -498,6 +650,8 @@ export default function ManagementPage() {
             checkInStartTime: data.attendanceSettings.waktuMulaiAbsen ?? "07:00",
             onTimeBeforeHour: data.attendanceSettings.batasTepatWaktu ?? "09:00",
             lateBeforeHour: data.attendanceSettings.batasTerlambat ?? "14:00",
+            checkOutStartTime: data.attendanceSettings.waktuMulaiPulang ?? "16:00",
+            checkOutEndTime: data.attendanceSettings.batasWaktuPulang ?? "18:00",
             workDays: data.attendanceSettings.hariKerja ?? [
               "monday",
               "tuesday",
@@ -635,23 +789,35 @@ export default function ManagementPage() {
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Status Absensi:</h3>
           <div className="flex items-center">
             <div
-              className={`h-2 w-2 rounded-full ${isWithinCheckInTime() ? "bg-green-500 animate-pulse" : "bg-red-500"
-                } mr-2`}
+              className={`h-2 w-2 rounded-full ${
+                isWithinCheckInTime() ? "bg-green-500 animate-pulse" : "bg-red-500"
+              } mr-2`}
             ></div>
             <span className="text-sm font-medium">
               {isWithinCheckInTime() ? "Sistem Absensi Aktif" : "Sistem Absensi Tidak Aktif"}
             </span>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg p-3">
-            <h4 className="font-medium text-gray-900 dark:text-white text-sm mb-2">Jam Absensi</h4>
+            <h4 className="font-medium text-gray-900 dark:text-white text-sm mb-2">Jam Masuk</h4>
             <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
               <div>
                 <span className="font-medium">Mulai:</span> {attendanceSettings.checkInStartTime}
               </div>
               <div>
                 <span className="font-medium">Selesai:</span> {attendanceSettings.lateBeforeHour}
+              </div>
+            </div>
+          </div>
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+            <h4 className="font-medium text-gray-900 dark:text-white text-sm mb-2">Jam Pulang</h4>
+            <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+              <div>
+                <span className="font-medium">Mulai:</span> {attendanceSettings.checkOutStartTime}
+              </div>
+              <div>
+                <span className="font-medium">Selesai:</span> {attendanceSettings.checkOutEndTime}
               </div>
             </div>
           </div>
@@ -670,7 +836,6 @@ export default function ManagementPage() {
                 <span className="inline-block w-3 h-3 rounded-full bg-red-500 mr-2"></span>
                 Tidak Hadir: Tidak absen atau absen setelah {attendanceSettings.lateBeforeHour}
               </div>
-
               <div>
                 <span className="inline-block w-3 h-3 rounded-full bg-purple-500 mr-2"></span>
                 Minggu: Hari Minggu
@@ -678,6 +843,10 @@ export default function ManagementPage() {
               <div>
                 <span className="inline-block w-3 h-3 rounded-full bg-orange-500 mr-2"></span>
                 Libur: Hari Libur Khusus
+              </div>
+              <div>
+                <span className="inline-block w-3 h-3 rounded-full bg-blue-500 mr-2"></span>
+                Pulang: Absen pulang {attendanceSettings.checkOutStartTime} - {attendanceSettings.checkOutEndTime}
               </div>
             </div>
           </div>
@@ -714,11 +883,11 @@ export default function ManagementPage() {
           setSelectedYear={setSelectedYear}
         />
         <button
-        onClick={downloadPDF}
-        className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors"
-      >
-        Download Rekap PDF
-      </button>
+          onClick={downloadPDF}
+          className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors"
+        >
+          Download Rekap PDF
+        </button>
       </div>
 
       {/* Attendance Table */}
@@ -747,18 +916,23 @@ export default function ManagementPage() {
                     NIP
                   </th>
                 </tr>
+                <tr>
+                  <th className="h-8 w-16 bg-emerald-50 dark:bg-emerald-900/20 border-b border-r"></th>
+                  <th className="h-8 w-48 bg-emerald-50 dark:bg-emerald-900/20 border-b border-r"></th>
+                  <th className="h-8 w-36 bg-emerald-50 dark:bg-emerald-900/20 border-b border-r"></th>
+                </tr>
               </thead>
               <tbody>
                 {filteredEmployees.length > 0 ? (
                   filteredEmployees.map((emp, i) => (
                     <tr key={emp.id} className="hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-colors">
-                      <td className="h-16 w-16 px-3 text-center text-sm border-b border-r bg-white dark:bg-gray-800">
+                      <td className="h-16 w-16 px-3 text-center text-sm border-b border-r bg-white dark:bg-gray-800 align-middle">
                         {i + 1}
                       </td>
-                      <td className="h-16 w-48 px-3 text-center text-sm border-b border-r bg-white dark:bg-gray-800">
+                      <td className="h-16 w-48 px-3 text-center text-sm border-b border-r bg-white dark:bg-gray-800 align-middle">
                         {emp.name}
                       </td>
-                      <td className="h-16 w-36 px-3 text-center text-sm border-b border-r bg-white dark:bg-gray-800">
+                      <td className="h-16 w-36 px-3 text-center text-sm border-b border-r bg-white dark:bg-gray-800 align-middle">
                         {emp.nip}
                       </td>
                     </tr>
@@ -807,25 +981,28 @@ export default function ManagementPage() {
                 <thead>
                   <tr>
                     <th
-                      colSpan={getDaysInSelectedMonth().length}
+                      colSpan={getDaysInSelectedMonth().length * 2}
                       className="h-12 bg-emerald-100 dark:bg-emerald-900/30 px-4 text-center text-sm font-semibold border-b border-r sticky top-0"
                     >
                       Absensi - {getSelectedMonthName()} {selectedYear}
                     </th>
                   </tr>
                   <tr className="sticky top-12">
-                    {getDaysInSelectedMonth().map((day) => {
+                    {getDaysInSelectedMonth().map((day, index) => {
                       const dayStr = day.toString().padStart(2, "0")
                       const dateKey = `${selectedYear}-${selectedMonth}-${dayStr}`
                       const isHolidayDay = isHoliday(dateKey)
+                      const isLastDay = index === getDaysInSelectedMonth().length - 1
 
                       return (
                         <th
                           key={day}
-                          className={`h-10 w-12 px-2 text-center text-xs font-medium border-b border-r relative group cursor-pointer transition-colors ${isHolidayDay
-                            ? "bg-orange-200 dark:bg-orange-900/50 hover:bg-orange-300 dark:hover:bg-orange-900/70"
-                            : "bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
-                            }`}
+                          colSpan={2}
+                          className={`h-10 w-24 px-2 text-center text-xs font-medium border-b border-r relative group cursor-pointer transition-colors ${
+                            isHolidayDay
+                              ? "bg-orange-200 dark:bg-orange-900/50 hover:bg-orange-300 dark:hover:bg-orange-900/70"
+                              : "bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
+                          }`}
                           onClick={() => handleHolidayToggle(dateKey)}
                           title={
                             isHolidayDay
@@ -847,27 +1024,60 @@ export default function ManagementPage() {
                       )
                     })}
                   </tr>
+                  <tr className="sticky top-22">
+                    {getDaysInSelectedMonth().map((day, dayIndex) => (
+                      <React.Fragment key={day}>
+                        <th className="h-8 w-12 px-1 bg-emerald-50 dark:bg-emerald-900/20 text-center text-xs font-medium text-gray-700 dark:text-gray-300 border-b border-r">
+                          Masuk
+                        </th>
+                        <th className="h-8 w-12 px-1 bg-blue-50 dark:bg-blue-900/20 text-center text-xs font-medium text-gray-700 dark:text-gray-300 border-b border-r">
+                          Pulang
+                        </th>
+                      </React.Fragment>
+                    ))}
+                  </tr>
                 </thead>
                 <tbody>
                   {filteredEmployees.length > 0 ? (
                     filteredEmployees.map((emp) => (
                       <tr key={emp.id} className="hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-colors">
-                        {getDaysInSelectedMonth().map((day) => {
+                        {getDaysInSelectedMonth().map((day, dayIndex) => {
                           const dayStr = day.toString().padStart(2, "0")
                           const dateKey = `${selectedYear}-${selectedMonth}-${dayStr}`
-                          const status = emp.attendance?.[dateKey] || "tidak"
+                          const checkinStatus = emp.attendance?.[dateKey] || "tidak"
+                          const checkoutStatus = emp.checkoutAttendance?.[dateKey] || "kosong"
+                          const isLastDay = dayIndex === getDaysInSelectedMonth().length - 1
 
                           return (
-                            <td key={day} className="h-16 w-12 px-2 text-center border-b border-r">
-                              <div
-                                className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold mx-auto ${getAttendanceColor(
-                                  status,
-                                )}`}
-                                title={getAttendanceTooltip(status, dateKey)}
-                              >
-                                {getAttendanceText(status)}
-                              </div>
-                            </td>
+                            <React.Fragment key={day}>
+                              {/* Check-in column */}
+                              <td className="h-16 w-12 px-2 text-center border-b border-r">
+                                <div
+                                  className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold mx-auto ${getAttendanceColor(
+                                    checkinStatus,
+                                  )}`}
+                                  title={getAttendanceTooltip(checkinStatus, dateKey)}
+                                >
+                                  {getAttendanceText(checkinStatus)}
+                                </div>
+                              </td>
+                              {/* Check-out column */}
+                              <td className="h-16 w-12 px-2 text-center border-b border-r">
+                                <div
+                                  className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold mx-auto ${getCheckoutAttendanceColor(
+                                    checkoutStatus === "kosong" ? checkinStatus : checkoutStatus,
+                                  )}`}
+                                  title={getCheckoutAttendanceTooltip(
+                                    checkoutStatus === "kosong" ? checkinStatus : checkoutStatus,
+                                    dateKey,
+                                  )}
+                                >
+                                  {getCheckoutAttendanceText(
+                                    checkoutStatus === "kosong" ? checkinStatus : checkoutStatus,
+                                  )}
+                                </div>
+                              </td>
+                            </React.Fragment>
                           )
                         })}
                       </tr>
@@ -875,7 +1085,7 @@ export default function ManagementPage() {
                   ) : (
                     <tr>
                       <td
-                        colSpan={getDaysInSelectedMonth().length}
+                        colSpan={getDaysInSelectedMonth().length * 2}
                         className="h-16 text-center text-sm border-b border-r bg-white dark:bg-gray-800"
                       >
                         Tidak ada data absensi
@@ -902,12 +1112,15 @@ export default function ManagementPage() {
                     H(T)/Total
                   </th>
                 </tr>
+                <tr>
+                  <th className="h-8 w-24 bg-emerald-50 dark:bg-emerald-900/20 border-b border-l"></th>
+                </tr>
               </thead>
               <tbody>
                 {filteredEmployees.length > 0 ? (
                   filteredEmployees.map((emp) => (
                     <tr key={emp.id} className="hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-colors">
-                      <td className="h-16 w-24 px-3 text-center border-b border-l bg-white dark:bg-gray-800">
+                      <td className="h-16 w-24 px-3 text-center border-b border-l bg-white dark:bg-gray-800 align-middle">
                         <div className="flex items-center justify-center font-mono text-sm text-gray-700 dark:text-gray-200">
                           {emp.summary}
                         </div>
@@ -935,13 +1148,23 @@ export default function ManagementPage() {
                     &nbsp;
                   </th>
                 </tr>
+                <tr>
+                  <th className="h-8 w-24 bg-emerald-50 dark:bg-emerald-900/20 border-b border-l"></th>
+                </tr>
               </thead>
               <tbody>
                 {filteredEmployees.length > 0 ? (
                   filteredEmployees.map((emp) => (
                     <tr key={emp.id} className="hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-colors">
-                      <td className="h-16 w-24 px-3 text-center border-b border-l bg-white dark:bg-gray-800">
-                        <div className="flex items-center justify-center">
+                      <td className="h-16 w-24 px-3 text-center border-b border-l bg-white dark:bg-gray-800 align-middle">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => startEditEmployee(emp)}
+                            className="p-2 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900 rounded-lg transition-colors"
+                            title={`Edit data ${emp.name}`}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
                           <button
                             onClick={() => handleDeleteEmployee(emp.id, emp.name)}
                             className="p-2 text-red-600 hover:bg-red-100 dark:hover:bg-red-900 rounded-lg transition-colors"
@@ -963,6 +1186,91 @@ export default function ManagementPage() {
           </div>
         </div>
       </div>
+
+      {/* Employee Edit Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Edit Data Karyawan</h3>
+              <button
+                onClick={resetEmployeeForm}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Nama Lengkap *
+                </label>
+                <input
+                  type="text"
+                  value={employeeForm.name}
+                  onChange={(e) => setEmployeeForm((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="Masukkan nama lengkap"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">NIP *</label>
+                <input
+                  type="text"
+                  value={employeeForm.nip}
+                  onChange={(e) => setEmployeeForm((prev) => ({ ...prev, nip: e.target.value }))}
+                  placeholder="Masukkan NIP"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
+                <input
+                  type="email"
+                  value={employeeForm.email}
+                  onChange={(e) => setEmployeeForm((prev) => ({ ...prev, email: e.target.value }))}
+                  placeholder="Masukkan email"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password Baru</label>
+                <input
+                  type="password"
+                  value={employeeForm.password}
+                  onChange={(e) => setEmployeeForm((prev) => ({ ...prev, password: e.target.value }))}
+                  placeholder="Kosongkan jika tidak ingin mengubah password"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Kosongkan jika tidak ingin mengubah password
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={handleEditEmployee}
+                disabled={!employeeForm.name.trim() || !employeeForm.nip.trim()}
+                className="flex-1 flex items-center justify-center px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Simpan Perubahan
+              </button>
+              <button
+                onClick={resetEmployeeForm}
+                className="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors"
+              >
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Settings Modal */}
       {isSettingsModalOpen && (
@@ -986,20 +1294,22 @@ export default function ManagementPage() {
             <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6">
               <button
                 onClick={() => setActiveTab("schedule")}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "schedule"
-                  ? "border-emerald-500 text-emerald-600 dark:text-emerald-400"
-                  : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                  }`}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === "schedule"
+                    ? "border-emerald-500 text-emerald-600 dark:text-emerald-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                }`}
               >
                 <Clock className="h-4 w-4 inline-block mr-2" />
                 Jam Kerja
               </button>
               <button
                 onClick={() => setActiveTab("holidays")}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "holidays"
-                  ? "border-emerald-500 text-emerald-600 dark:text-emerald-400"
-                  : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                  }`}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === "holidays"
+                    ? "border-emerald-500 text-emerald-600 dark:text-emerald-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                }`}
               >
                 <Calendar className="h-4 w-4 inline-block mr-2" />
                 Hari Libur
@@ -1018,7 +1328,7 @@ export default function ManagementPage() {
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        1. Waktu Mulai Absen
+                        1. Waktu Mulai Absen Masuk
                       </label>
                       <input
                         type="time"
@@ -1029,7 +1339,7 @@ export default function ManagementPage() {
                         className="w-full px-3 py-2 border border-emerald-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                       />
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        Waktu mulai karyawan bisa melakukan absensi
+                        Waktu mulai karyawan bisa melakukan absensi masuk
                       </p>
                     </div>
 
@@ -1046,7 +1356,7 @@ export default function ManagementPage() {
                         className="w-full px-3 py-2 border border-emerald-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                       />
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        Absen sebelum jam ini akan dianggap Hadir (tepat waktu)
+                        Absen masuk sebelum jam ini akan dianggap Hadir (tepat waktu)
                       </p>
                     </div>
 
@@ -1061,9 +1371,51 @@ export default function ManagementPage() {
                         className="w-full px-3 py-2 border border-emerald-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                       />
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        Absen setelah jam tepat waktu dan sebelum jam ini akan dianggap Terlambat. Absen setelah jam
-                        ini atau tidak absen akan dianggap Tidak Hadir.
+                        Absen masuk setelah jam tepat waktu dan sebelum jam ini akan dianggap Terlambat. Absen setelah
+                        jam ini atau tidak absen akan dianggap Tidak Hadir.
                       </p>
+                    </div>
+
+                    <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
+                      <h5 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                        Pengaturan Jam Pulang
+                      </h5>
+
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            4. Waktu Mulai Absen Pulang
+                          </label>
+                          <input
+                            type="time"
+                            value={attendanceSettings.checkOutStartTime}
+                            onChange={(e) =>
+                              setAttendanceSettings((prev) => ({ ...prev, checkOutStartTime: e.target.value }))
+                            }
+                            className="w-full px-3 py-2 border border-emerald-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                          />
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Waktu mulai karyawan bisa melakukan absensi pulang
+                          </p>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            5. Batas Waktu Absen Pulang
+                          </label>
+                          <input
+                            type="time"
+                            value={attendanceSettings.checkOutEndTime}
+                            onChange={(e) =>
+                              setAttendanceSettings((prev) => ({ ...prev, checkOutEndTime: e.target.value }))
+                            }
+                            className="w-full px-3 py-2 border border-emerald-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                          />
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Batas waktu terakhir karyawan bisa melakukan absensi pulang
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                   <div className="mt-3 p-3 bg-emerald-50 dark:bg-emerald-900/30 rounded-lg border border-emerald-100 dark:border-emerald-800">
@@ -1100,24 +1452,35 @@ export default function ManagementPage() {
                   <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Preview Pengaturan:</h4>
                   <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
                     <div>
-                      <strong>Jam Absensi:</strong> {attendanceSettings.checkInStartTime} -{" "}
+                      <strong>Jam Absensi Masuk:</strong> {attendanceSettings.checkInStartTime} -{" "}
                       {attendanceSettings.lateBeforeHour}
                     </div>
                     <div>
-                      <span className="inline-block w-3 h-3 rounded-full bg-green-500 mr-2"></span>
-                      Hadir: Absen {attendanceSettings.checkInStartTime} - {attendanceSettings.onTimeBeforeHour}
+                      <strong>Jam Absensi Pulang:</strong> {attendanceSettings.checkOutStartTime} -{" "}
+                      {attendanceSettings.checkOutEndTime}
                     </div>
-                    <div>
-                      <span className="inline-block w-3 h-3 rounded-full bg-yellow-500 mr-2"></span>
-                      Terlambat: Absen {attendanceSettings.onTimeBeforeHour} - {attendanceSettings.lateBeforeHour}
-                    </div>
-                    <div>
-                      <span className="inline-block w-3 h-3 rounded-full bg-red-500 mr-2"></span>
-                      Tidak Hadir: Tidak absen atau absen setelah {attendanceSettings.lateBeforeHour}
-                    </div>
-                    <div>
-                      <span className="inline-block w-3 h-3 rounded-full bg-orange-500 mr-2"></span>
-                      Libur: Hari libur khusus (dapat diatur per tanggal)
+                    <div className="mt-2 pt-2 border-t border-emerald-200 dark:border-emerald-700">
+                      <div>
+                        <span className="inline-block w-3 h-3 rounded-full bg-green-500 mr-2"></span>
+                        Hadir: Absen masuk {attendanceSettings.checkInStartTime} - {attendanceSettings.onTimeBeforeHour}
+                      </div>
+                      <div>
+                        <span className="inline-block w-3 h-3 rounded-full bg-yellow-500 mr-2"></span>
+                        Terlambat: Absen masuk {attendanceSettings.onTimeBeforeHour} -{" "}
+                        {attendanceSettings.lateBeforeHour}
+                      </div>
+                      <div>
+                        <span className="inline-block w-3 h-3 rounded-full bg-red-500 mr-2"></span>
+                        Tidak Hadir: Tidak absen atau absen setelah {attendanceSettings.lateBeforeHour}
+                      </div>
+                      <div>
+                        <span className="inline-block w-3 h-3 rounded-full bg-blue-500 mr-2"></span>
+                        Absen Pulang: {attendanceSettings.checkOutStartTime} - {attendanceSettings.checkOutEndTime}
+                      </div>
+                      <div>
+                        <span className="inline-block w-3 h-3 rounded-full bg-orange-500 mr-2"></span>
+                        Libur: Hari libur khusus (dapat diatur per tanggal)
+                      </div>
                     </div>
                     <div className="mt-2">
                       <strong>Hari Kerja:</strong>{" "}
@@ -1294,10 +1657,11 @@ export default function ManagementPage() {
                             }
                           }}
                           disabled={exists}
-                          className={`p-2 text-xs rounded-lg transition-colors ${exists
-                            ? "bg-gray-200 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
-                            : "bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600"
-                            }`}
+                          className={`p-2 text-xs rounded-lg transition-colors ${
+                            exists
+                              ? "bg-gray-200 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
+                              : "bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600"
+                          }`}
                         >
                           {commonHoliday.name}
                           {exists && " ✓"}

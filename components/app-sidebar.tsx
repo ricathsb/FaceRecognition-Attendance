@@ -44,8 +44,8 @@ export function AppSidebar() {
     const handleLogout = async () => {
         if (confirm("Apakah Anda yakin ingin keluar?")) {
             try {
-                // Call backend logout API
-                await fetch("http://localhost:5000/api/logout", {
+                const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL
+                await fetch(`${BASE_URL}/api/logout`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                 })

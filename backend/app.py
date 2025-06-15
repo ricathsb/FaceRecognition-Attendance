@@ -19,10 +19,10 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Konfigurasi Database
-DB_HOST = os.environ.get("DB_HOST", "localhost")
-DB_NAME = os.environ.get("DB_NAME", "face_recognation")
-DB_USER = os.environ.get("DB_USER", "postgres")
-DB_PASS = os.environ.get("DB_PASS", "3421")
+DB_HOST = os.environ.get("DB_HOST", "HOST")
+DB_NAME = os.environ.get("DB_NAME", "DATABASE")
+DB_USER = os.environ.get("DB_USER", "USERNAME")
+DB_PASS = os.environ.get("DB_PASS", "PASSWORD")
 
 def get_db_connection():
     try:
@@ -170,8 +170,10 @@ def login():
     email = data.get('email')
     password = data.get('password')
 
-    # Admin hardcoded
-    if email == 'admin@example.com' and password == 'admin123':
+    admin_email = os.getenv('ADMIN_EMAIL')
+    admin_password = os.getenv('ADMIN_PASSWORD')
+
+    if email == admin_email and password == admin_password:
         return jsonify({"message": "Login berhasil", "role": "admin"}), 200
 
     conn = get_db_connection()
