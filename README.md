@@ -15,8 +15,8 @@ Pastikan sudah terinstall:
 ### 1. Clone Repository
 
 ```bash
-git clone <repository-url>
-cd <project-directory>
+git clone https://github.com/muhfadtz/FaceRecognition-Attendance
+cd backend
 ```
 
 ### 2. Setup Frontend (Terminal 1)
@@ -43,12 +43,12 @@ Edit file `prisma/schema.prisma` dengan kode berikut:
 ```prisma
 // prisma/schema.prisma
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model CatatanAbsensi {
@@ -165,21 +165,25 @@ npm run dev
 
 Buka browser dan akses URL yang ditampilkan di Terminal 1 (biasanya `http://localhost:3000` atau `http://localhost:5173`).
 
+---
+
 ## Struktur Project
 
 ```
 project-root/
 ├── backend/
-│   ├── app.py
-│   ├── .env
-│   ├── requirements.txt
-│   └── ...
+│   ├── app.py
+│   ├── .env
+│   ├── requirements.txt
+│   └── ...
 ├── prisma/
-│   └── schema.prisma
+│   └── schema.prisma
 ├── .env
 ├── package.json
 └── README.md
 ```
+
+---
 
 ## Troubleshooting
 
@@ -196,6 +200,8 @@ project-root/
 - Jika error saat install `psycopg2-binary`, coba install PostgreSQL development headers
 - Pastikan Python virtual environment aktif (opsional tapi direkomendasikan)
 
+---
+
 ## Technologies Used
 
 - **Frontend:** React.js
@@ -203,6 +209,8 @@ project-root/
 - **Database:** PostgreSQL
 - **ORM:** Prisma
 - **Face Recognition:** Python libraries (sesuai requirements.txt)
+
+---
 
 ## Contributing
 
