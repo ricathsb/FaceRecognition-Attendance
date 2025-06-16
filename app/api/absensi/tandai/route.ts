@@ -6,7 +6,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL
 const FLASK_ATTENDANCE_URL = `${BASE_URL}/attendance`
 const OFFICE_LAT = 3.5720457160318526
 const OFFICE_LNG = 98.65209546049589
-const MAX_DISTANCE_METERS = 50000
+const MAX_DISTANCE_METERS = 200
 
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000
