@@ -13,7 +13,8 @@ export async function GET() {
         let flaskStatus = "disconnected"
         let flaskError = null
         try {
-            const flaskResponse = await fetch("http://localhost:5000/health", {
+            const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL
+            const flaskResponse = await fetch(`${BASE_URL}/Health`, {
                 method: "GET",
                 headers: { "Content-Type": "application/json" },
             })

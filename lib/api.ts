@@ -72,16 +72,24 @@ export async function markAttendance(
   longitude?: number
 ): Promise<AttendanceResponse> {
   try {
+    // Ambil token dari localStorage jika pakai JWT (opsional, tergantung sistem auth)
+    const token = localStorage.getItem("token") // Jika pakai session cookie, abaikan bagian ini
+
     const response = await fetch("/api/absensi/tandai", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}), // Tambahkan header Authorization jika ada token
+      },
+      credentials: "include", // WAJIB jika backend pakai session cookie
       body: JSON.stringify({ image: imageData, latitude, longitude }),
     })
 
     const data = await response.json()
 
+    // Cek jika request ditolak
     if (!response.ok) {
-      throw new Error(data.message || `Gagal menandai absensi dari server. Status: ${response.status}`)
+      throw new Error(data.message || `Gagal menandai absensi. Status: ${response.status}`)
     }
 
     return {
@@ -96,10 +104,11 @@ export async function markAttendance(
     }
   } catch (error: any) {
     console.error("Error di fungsi markAttendance (lib/api.ts):", error)
+
     return {
       success: false,
-      message: error.message.includes("Unexpected token '<'")
-        ? "Terjadi kesalahan komunikasi dengan server (absensi). Pastikan endpoint API sudah benar dan server tidak error."
+      message: error.message?.includes("Unexpected token '<'")
+        ? "Terjadi kesalahan komunikasi dengan server absensi. Periksa apakah endpoint salah atau server error."
         : error.message || "Terjadi kesalahan saat menghubungi server absensi.",
     }
   }

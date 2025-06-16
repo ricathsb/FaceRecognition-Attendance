@@ -26,7 +26,8 @@ export function Navbar() {
 
   const handleLogout = async () => {
     try {
-      await fetch("http://localhost:5000/api/logout", {
+      const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL
+      await fetch(`${BASE_URL}/api/logout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       })

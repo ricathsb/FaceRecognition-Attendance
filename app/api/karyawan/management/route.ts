@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         nama: true,
+        email:true,
         nip: true,
         status: true, // Include status in the selection
         catatanAbsensi: {
@@ -254,6 +255,7 @@ export async function GET(request: NextRequest) {
         employeeId: karyawan.id.toString().padStart(6, "0"),
         name: karyawan.nama,
         nip: karyawan.nip,
+        email : karyawan.email,
         status: karyawan.status || "Staff", // Include status in the response
         attendance,
         summary,
