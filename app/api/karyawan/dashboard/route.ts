@@ -4,7 +4,9 @@ import dayjs from "dayjs"
 import "dayjs/locale/id"
 import utc from "dayjs/plugin/utc"
 import timezone from "dayjs/plugin/timezone"
+import isSameOrAfter from "dayjs/plugin/isSameOrAfter"
 
+dayjs.extend(isSameOrAfter)
 dayjs.extend(utc)
 dayjs.extend(timezone)
 dayjs.locale("id")
@@ -20,65 +22,85 @@ export async function GET() {
       return NextResponse.json({ error: "Pengaturan absen tidak ditemukan" }, { status: 404 })
     }
 
-    const [totalKaryawan, semuaAbsensiHariIni] = await Promise.all([
-  prisma.karyawan.count(),
-  prisma.catatanAbsensi.findMany({
-    where: {
-      timestamp_absensi: {
-        gte: todayStart,
-        lte: todayEnd,
-      },
-    },
-    include: {
-      karyawan: {
-        select: {
-          nama: true,
-          status: true,
-        },
-      },
-    },
-    orderBy: {
-      timestamp_absensi: "desc",
-    },
-  }),
-])
+    const waktuMulaiPulang = dayjs(`${now.format("YYYY-MM-DD")}T${pengaturan.waktuMulaiPulang}:00`).tz("Asia/Jakarta")
 
+    const [totalKaryawan, semuaAbsensiHariIni] = await Promise.all([
+      prisma.karyawan.count(),
+      prisma.catatanAbsensi.findMany({
+        where: {
+          timestamp_absensi: {
+            gte: todayStart,
+            lte: todayEnd,
+          },
+        },
+        include: {
+          karyawan: {
+            select: {
+              nama: true,
+              status: true,
+            },
+          },
+        },
+        orderBy: {
+          timestamp_absensi: "desc",
+        },
+      }),
+    ])
 
     const hadirSet = new Set()
+    const pulangSet = new Set()
     let hadir = 0
     let telat = 0
-    let absen = 0
+    let pulang = 0
     const aktivitasTerbaru: any[] = []
 
     for (const absenData of semuaAbsensiHariIni) {
       const { id, karyawan, karyawanId, timestamp_absensi, status } = absenData
+      const absensiTime = dayjs(timestamp_absensi).tz("Asia/Jakarta")
 
-      if (!hadirSet.has(karyawanId)) {
+      // Hitung hadir dan terlambat
+      if (!hadirSet.has(karyawanId) && absensiTime.isBefore(waktuMulaiPulang)) {
         hadirSet.add(karyawanId)
         hadir++
-
-        if (status === "terlambat") {
-          telat++
-        }
 
         aktivitasTerbaru.push({
           id,
           name: karyawan.nama,
           role: karyawan.status,
-          action: `Check-in pada ${dayjs(timestamp_absensi).tz("Asia/Jakarta").format("HH:mm")}`,
-          time: dayjs(timestamp_absensi).tz("Asia/Jakarta").format("HH:mm"),
+          action: `Check-in pada ${absensiTime.format("HH:mm")}`,
+          time: absensiTime.format("HH:mm"),
           status: status === "terlambat" ? "late" : "ontime",
+        })
+
+        if (status === "terlambat") {
+          telat++
+        }
+      }
+
+      // Hitung pulang
+      if (!pulangSet.has(karyawanId) && absensiTime.isSameOrAfter(waktuMulaiPulang)) {
+        pulangSet.add(karyawanId)
+        pulang++
+
+        aktivitasTerbaru.push({
+          id,
+          name: karyawan.nama,
+          role: karyawan.status,
+          action: `Checkout pada ${absensiTime.format("HH:mm")}`,
+          time: absensiTime.format("HH:mm"),
+          status: "checkout",
         })
       }
     }
 
-    absen = totalKaryawan - hadir
+    const absen = totalKaryawan - hadir
 
     return NextResponse.json({
       totalKaryawan,
       hadir,
       absen,
       telat,
+      pulang,
       aktivitasTerbaru,
     })
   } catch (error) {

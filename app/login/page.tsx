@@ -40,8 +40,8 @@ export default function LoginPage() {
         }
 
         try {
-            // Gunakan Flask backend API
-            const res = await fetch("http://localhost:5000/api/login", {
+            const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL
+            const res = await fetch(`${BASE_URL}/api/login`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email, password }),

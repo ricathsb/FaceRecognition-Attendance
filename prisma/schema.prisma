@@ -7,8 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
-
 model CatatanAbsensi {
   id                Int      @id @default(autoincrement())
   timestamp_absensi DateTime
@@ -21,13 +19,15 @@ model CatatanAbsensi {
 }
 
 model PengaturanAbsensi {
-  id               Int      @id @default(autoincrement())
-  waktuMulaiAbsen  String
-  batasTepatWaktu  String
-  batasTerlambat   String
-  hariKerja        String[] // array string PostgreSQL
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                Int      @id @default(autoincrement())
+  waktuMulaiAbsen   String
+  batasTepatWaktu   String
+  batasTerlambat    String
+  waktuMulaiPulang  String   @default("16:00") // Default checkout start time
+  batasWaktuPulang  String   @default("18:00") // Default checkout end time
+  hariKerja         String[] // array string PostgreSQL
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@map("PengaturanAbsensi")
 }
