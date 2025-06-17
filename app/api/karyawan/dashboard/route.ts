@@ -54,44 +54,43 @@ export async function GET() {
     let pulang = 0
     const aktivitasTerbaru: any[] = []
 
-    for (const absenData of semuaAbsensiHariIni) {
-      const { id, karyawan, karyawanId, timestamp_absensi, status } = absenData
-      const absensiTime = dayjs(timestamp_absensi).tz("Asia/Jakarta")
+      for (const absenData of semuaAbsensiHariIni) {
+    const { id, karyawan, karyawanId, timestamp_absensi, status } = absenData
+    const absensiTime = dayjs(timestamp_absensi).tz("Asia/Jakarta")
 
-      // Hitung hadir dan terlambat
-      if (!hadirSet.has(karyawanId) && absensiTime.isBefore(waktuMulaiPulang)) {
-        hadirSet.add(karyawanId)
-        hadir++
+    if (!hadirSet.has(karyawanId) && (status === "tepat waktu" || status === "terlambat")) {
+      hadirSet.add(karyawanId)
+      hadir++
 
-        aktivitasTerbaru.push({
-          id,
-          name: karyawan.nama,
-          role: karyawan.status,
-          action: `Check-in pada ${absensiTime.format("HH:mm")}`,
-          time: absensiTime.format("HH:mm"),
-          status: status === "terlambat" ? "late" : "ontime",
-        })
+      aktivitasTerbaru.push({
+        id,
+        name: karyawan.nama,
+        role: karyawan.status,
+        action: `Check-in pada ${absensiTime.format("HH:mm")}`,
+        time: absensiTime.format("HH:mm"),
+        status: status === "terlambat" ? "late" : "tepat waktu",
+      })
 
-        if (status === "terlambat") {
-          telat++
-        }
-      }
-
-      // Hitung pulang
-      if (!pulangSet.has(karyawanId) && absensiTime.isSameOrAfter(waktuMulaiPulang)) {
-        pulangSet.add(karyawanId)
-        pulang++
-
-        aktivitasTerbaru.push({
-          id,
-          name: karyawan.nama,
-          role: karyawan.status,
-          action: `Checkout pada ${absensiTime.format("HH:mm")}`,
-          time: absensiTime.format("HH:mm"),
-          status: "checkout",
-        })
+      if (status === "terlambat") {
+        telat++
       }
     }
+
+    if (!pulangSet.has(karyawanId) && status === "pulang") {
+      pulangSet.add(karyawanId)
+      pulang++
+
+      aktivitasTerbaru.push({
+        id,
+        name: karyawan.nama,
+        role: karyawan.status,
+        action: `Checkout pada ${absensiTime.format("HH:mm")}`,
+        time: absensiTime.format("HH:mm"),
+        status: "pulang",
+      })
+    }
+  }
+
 
     const absen = totalKaryawan - hadir
 

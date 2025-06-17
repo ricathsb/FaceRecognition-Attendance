@@ -84,6 +84,7 @@ const ATTENDANCE_STATUS = {
   SATURDAY: "sabtu" as const,
   SUNDAY: "minggu" as const,
   HOLIDAY: "libur" as const,
+  CHECKOUT: "pulang" as const,
 } as const
 
 export default function ManagementPage() {
@@ -142,6 +143,25 @@ export default function ManagementPage() {
   const getSelectedMonthName = () => {
     const month = MONTHS.find((m) => m.value === selectedMonth)
     return month?.label || "Januari"
+  }
+
+  // Enhanced function to parse combined attendance data
+  const parseAttendanceData = (attendanceString: string) => {
+    if (!attendanceString) return { checkIn: "tidak", checkOut: "kosong" }
+
+    // Handle combined format like "tepat waktu,pulang"
+    if (attendanceString.includes(",")) {
+      const [checkIn, checkOut] = attendanceString.split(",").map((s) => s.trim())
+      return { checkIn: checkIn || "tidak", checkOut: checkOut || "kosong" }
+    }
+
+    // Handle single status - determine if it's check-in or check-out
+    if (attendanceString === "pulang") {
+      return { checkIn: "tidak", checkOut: "pulang" }
+    }
+
+    // Default to check-in status
+    return { checkIn: attendanceString, checkOut: "kosong" }
   }
 
   // Ganti fungsi getAttendanceColor
@@ -588,7 +608,7 @@ export default function ManagementPage() {
     scrollContainerRef.current?.scrollBy({ left: 200, behavior: "smooth" })
   }
 
-  // Data fetching
+  // Data fetching with enhanced attendance parsing
   const fetchEmployeesAndSettings = useCallback(
     async (forceRefresh = false) => {
       // Use cache if available and not forcing refresh
@@ -619,7 +639,25 @@ export default function ManagementPage() {
         }
 
         if (Array.isArray(cachedData.employees)) {
-          setEmployeeData(cachedData.employees)
+          // Parse combined attendance data for each employee
+          const processedEmployees = cachedData.employees.map((emp: Employee) => {
+            const processedAttendance: { [key: string]: string } = {}
+            const processedCheckout: { [key: string]: string } = {}
+
+            Object.entries(emp.attendance || {}).forEach(([date, status]) => {
+              const { checkIn, checkOut } = parseAttendanceData(status as string)
+              processedAttendance[date] = checkIn
+              processedCheckout[date] = checkOut
+            })
+
+            return {
+              ...emp,
+              attendance: processedAttendance,
+              checkoutAttendance: processedCheckout,
+            }
+          })
+
+          setEmployeeData(processedEmployees)
           setLastFetchTime(cachedData.timestamp || new Date().toLocaleString())
         }
 
@@ -663,8 +701,30 @@ export default function ManagementPage() {
           })
         }
 
-        // Update employee data
-        setEmployeeData(Array.isArray(data.employees) ? data.employees : [])
+        // Process employee data with combined attendance parsing
+        if (Array.isArray(data.employees)) {
+          const processedEmployees = data.employees.map((emp: Employee) => {
+            const processedAttendance: { [key: string]: string } = {}
+            const processedCheckout: { [key: string]: string } = {}
+
+            Object.entries(emp.attendance || {}).forEach(([date, status]) => {
+              const { checkIn, checkOut } = parseAttendanceData(status as string)
+              processedAttendance[date] = checkIn
+              processedCheckout[date] = checkOut
+            })
+
+            return {
+              ...emp,
+              attendance: processedAttendance,
+              checkoutAttendance: processedCheckout,
+            }
+          })
+
+          setEmployeeData(processedEmployees)
+        } else {
+          setEmployeeData([])
+        }
+
         setLastFetchTime(data.timestamp || new Date().toLocaleString())
 
         // Update holidays data

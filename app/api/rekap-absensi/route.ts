@@ -47,16 +47,14 @@ export async function GET(req: Request) {
       groupedByRole[role].push(record)
     }
 
-    // Gunakan path string font, jangan baca file dengan fs
     const fontRegularPath = path.resolve(process.cwd(), "public/fonts/Roboto-Regular.ttf")
     const fontBoldPath = path.resolve(process.cwd(), "public/fonts/Roboto-Bold.ttf")
 
-        const doc = new PDFDocument({
+    const doc = new PDFDocument({
       margin: 50,
       size: "A4",
-      font: fontRegularPath // langsung set font utama di constructor
+      font: fontRegularPath,
     })
-
 
     doc.registerFont("regular", fontRegularPath)
     doc.registerFont("bold", fontBoldPath)
@@ -82,8 +80,8 @@ export async function GET(req: Request) {
       doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke()
 
       const tableTop = doc.y + 10
-      const colWidths = [30, 150, 100, 120, 120]
-      const headers = ["No", "Nama", "NIP", "Waktu Masuk", "Waktu Pulang"]
+      const colWidths = [30, 120, 100, 120, 120]
+      const headers = ["No", "Tanggal", "Nama", "Masuk", "Pulang"]
 
       doc.font("bold").fontSize(10).fillColor("#000")
       let x = 50
@@ -95,50 +93,58 @@ export async function GET(req: Request) {
       const groupedKaryawan: Record<string, {
         nama: string
         nip: string
+        tanggal: string
         masuk?: string
         pulang?: string
-      }> = {}
+      }[]> = {}
 
       for (const d of data) {
         const nip = d.karyawan.nip
-        const waktu = dayjs(d.timestamp_absensi).tz("Asia/Jakarta").format("DD MMM YYYY HH:mm")
-        if (!groupedKaryawan[nip]) {
-          groupedKaryawan[nip] = {
-            nama: d.karyawan.nama,
-            nip: d.karyawan.nip,
-          }
-        }
+        const nama = d.karyawan.nama
+        const tanggal = dayjs(d.timestamp_absensi).tz("Asia/Jakarta").format("DD MMM YYYY")
+        const waktuLengkap = dayjs(d.timestamp_absensi).tz("Asia/Jakarta").format("HH:mm")
         const status = d.status.toLowerCase()
+
+        if (!groupedKaryawan[nip]) groupedKaryawan[nip] = []
+
+        let record = groupedKaryawan[nip].find(r => r.tanggal === tanggal)
+        if (!record) {
+          record = { nama, nip, tanggal }
+          groupedKaryawan[nip].push(record)
+        }
+
         if (["tepat waktu", "terlambat"].includes(status)) {
-          if (!groupedKaryawan[nip].masuk) groupedKaryawan[nip].masuk = waktu
+          if (!record.masuk) record.masuk = waktuLengkap
         } else if (status.includes("pulang")) {
-          groupedKaryawan[nip].pulang = waktu
+          record.pulang = waktuLengkap
         }
       }
 
       let y = tableTop + 20
       let index = 1
-      for (const item of Object.values(groupedKaryawan)) {
-        if (y > 750) {
-          doc.addPage()
-          doc.font("regular")
-          y = 50
-        }
+      for (const rows of Object.values(groupedKaryawan)) {
+        for (const item of rows) {
+          if (y > 750) {
+            doc.addPage()
+            doc.font("regular")
+            y = 50
+          }
 
-        let colX = 50
-        const values = [
-          String(index++),
-          item.nama,
-          item.nip,
-          item.masuk || "-",
-          item.pulang || "-",
-        ]
-        doc.font("regular").fontSize(9).fillColor("#000")
-        values.forEach((val, i) => {
-          doc.text(val, colX + 2, y, { width: colWidths[i] - 4 })
-          colX += colWidths[i]
-        })
-        y += 18
+          let colX = 50
+          const values = [
+            String(index++),
+            item.tanggal,
+            item.nama,
+            item.masuk || "-",
+            item.pulang || "-",
+          ]
+          doc.font("regular").fontSize(9).fillColor("#000")
+          values.forEach((val, i) => {
+            doc.text(val, colX + 2, y, { width: colWidths[i] - 4 })
+            colX += colWidths[i]
+          })
+          y += 18
+        }
       }
     }
 

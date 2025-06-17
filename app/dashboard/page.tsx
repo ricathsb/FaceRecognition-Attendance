@@ -172,15 +172,11 @@ function DashboardContent() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "ontime":
+      case "tepat waktu":
         return "text-green-700 bg-green-100 dark:bg-green-900 dark:text-green-300"
-      case "late":
+      case "terlambat":
         return "text-orange-700 bg-orange-100 dark:bg-orange-900 dark:text-orange-300"
-      case "permission":
-        return "text-blue-700 bg-blue-100 dark:bg-blue-900 dark:text-blue-300"
-      case "sick":
-        return "text-purple-700 bg-purple-100 dark:bg-purple-900 dark:text-purple-300"
-      case "checkout":
+      case "pulang":
         return "text-purple-700 bg-purple-100 dark:bg-purple-900 dark:text-purple-300"
       default:
         return "text-gray-700 bg-gray-100 dark:bg-gray-900 dark:text-gray-300"
@@ -189,15 +185,11 @@ function DashboardContent() {
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case "ontime":
+      case "tepat waktu":
         return "Tepat Waktu"
-      case "late":
+      case "terlambat":
         return "Terlambat"
-      case "permission":
-        return "Izin"
-      case "sick":
-        return "Sakit"
-      case "checkout":
+      case "pulang":
         return "Pulang"
       default:
         return "Unknown"

@@ -163,10 +163,15 @@ export async function GET(request: NextRequest) {
           const status = absen.status.toLowerCase()
 
           // Pastikan hanya mengambil record pertama untuk tanggal yang sama
-          if (!(tanggal in attendance)) {
-            attendance[tanggal] = status
-            console.log(`✅ Added attendance: ${tanggal} = ${status}`)
+        if (!(tanggal in attendance)) {
+          attendance[tanggal] = status
+        } else {
+          // Gabungkan status jika belum ada
+          if (!attendance[tanggal].includes(status)) {
+            attendance[tanggal] += `,${status}`
           }
+        }
+        console.log(`✅ Updated attendance: ${tanggal} = ${attendance[tanggal]}`)
         }
       })
 
@@ -313,34 +318,49 @@ export async function PUT(req: Request) {
     console.log("🔄 API Management PUT - Request received")
 
     const body = await req.json()
-    const { checkInStartTime, onTimeBeforeHour, lateBeforeHour, workDays } = body
+    const {
+      checkInStartTime,
+      onTimeBeforeHour,
+      lateBeforeHour,
+      checkOutStartTime,
+      checkOutEndTime,
+      workDays
+    } = body
 
-    console.log("📝 Updating settings:", { checkInStartTime, onTimeBeforeHour, lateBeforeHour, workDays })
+    console.log("📝 Updating settings:", {
+      checkInStartTime,
+      onTimeBeforeHour,
+      lateBeforeHour,
+      checkOutStartTime,
+      checkOutEndTime,
+      workDays,
+    })
 
-    // Pastikan workDays dalam format bahasa Inggris yang konsisten
+    // Normalisasi nama hari
     const normalizedWorkDays = workDays.map((day: string) => day.toLowerCase())
+
+    // Siapkan data update
+    const dataUpdate = {
+  waktuMulaiAbsen: checkInStartTime,
+  batasTepatWaktu: onTimeBeforeHour,
+  batasTerlambat: lateBeforeHour,
+  waktuMulaiPulang: checkOutStartTime,
+  batasWaktuPulang: checkOutEndTime, // ✅ Gunakan nama field sesuai schema
+  hariKerja: normalizedWorkDays,
+}
+
 
     const existing = await prisma.pengaturanAbsensi.findFirst()
 
     if (existing) {
       await prisma.pengaturanAbsensi.update({
         where: { id: existing.id },
-        data: {
-          waktuMulaiAbsen: checkInStartTime,
-          batasTepatWaktu: onTimeBeforeHour,
-          batasTerlambat: lateBeforeHour,
-          hariKerja: normalizedWorkDays,
-        },
+        data: dataUpdate,
       })
       console.log("✅ Settings updated")
     } else {
       await prisma.pengaturanAbsensi.create({
-        data: {
-          waktuMulaiAbsen: checkInStartTime,
-          batasTepatWaktu: onTimeBeforeHour,
-          batasTerlambat: lateBeforeHour,
-          hariKerja: normalizedWorkDays,
-        },
+        data: dataUpdate,
       })
       console.log("✅ Settings created")
     }
@@ -351,6 +371,7 @@ export async function PUT(req: Request) {
     return NextResponse.json({ message: "Gagal menyimpan pengaturan", detail: error.message }, { status: 500 })
   }
 }
+
 
 export async function DELETE(req: NextRequest) {
   try {
