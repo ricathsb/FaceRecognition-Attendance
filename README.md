@@ -107,6 +107,10 @@ model HariLibur {
 **File `.env` di luar setara dengan folder (app):**
 ```env
 DATABASE_URL="postgresql://username:password@localhost:5432/face_recognation?schema=public"
+NEXT_PUBLIC_BASE_URL=http://localhost:5000
+NEXT_PUBLIC_OFFICE_LAT="latitude kantor"
+NEXT_PUBLIC_OFFICE_LNG="logitude Kantor"
+NEXT_PUBLIC_MAX_DISTANCE_METERS="max radius"
 ```
 
 **File `.env` (setara dengan folder model di (folder backend)):**
@@ -115,6 +119,9 @@ DB_HOST=localhost
 DB_NAME=face_recognation
 DB_USER="username"
 DB_PASS="password"
+
+ADMIN_EMAIL="email admin"
+ADMIN_PASSWORD="password"
 ```
 
 > **Note:** Ganti `username` dan `password` dengan kredensial PostgreSQL Anda.
