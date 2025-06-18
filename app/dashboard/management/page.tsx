@@ -414,7 +414,7 @@ export default function ManagementPage() {
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = `AI Ittihadiyah-rekap-absensi-${selectedMonth}-${selectedYear}.pdf`
+      a.download = `AI Ittihadiyah-rekap-absensi-${selectedMonth}-${selectedYear}.xlsx`
       a.click()
       window.URL.revokeObjectURL(url)
     } catch (error: any) {
@@ -946,7 +946,7 @@ export default function ManagementPage() {
           onClick={downloadPDF}
           className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors"
         >
-          Download Rekap PDF
+          Download Rekap Absensi
         </button>
       </div>
 

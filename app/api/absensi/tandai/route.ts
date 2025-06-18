@@ -4,9 +4,9 @@ import { AttendanceResponse } from "@/lib/api"
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL
 const FLASK_ATTENDANCE_URL = `${BASE_URL}/attendance`
-const OFFICE_LAT = 3.5720457160318526
-const OFFICE_LNG = 98.65209546049589
-const MAX_DISTANCE_METERS = 200
+const OFFICE_LAT = parseFloat(process.env.NEXT_PUBLIC_OFFICE_LAT || "0");
+const OFFICE_LNG = parseFloat(process.env.NEXT_PUBLIC_OFFICE_LNG || "0");
+const MAX_DISTANCE_METERS = parseInt(process.env.NEXT_PUBLIC_MAX_DISTANCE_METERS || "1200000000");
 
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000
@@ -72,6 +72,27 @@ export async function POST(req: Request) {
     }
 
     const now = new Date()
+    const awalHari = new Date(now); awalHari.setHours(0, 0, 0, 0)
+    const akhirHari = new Date(now); akhirHari.setHours(23, 59, 59, 999)
+
+    // 🔒 Cek Hari Libur Nasional
+    const liburHariIni = await prisma.hariLibur.findFirst({
+      where: {
+        tanggal: {
+          gte: awalHari,
+          lte: akhirHari,
+        },
+      },
+    })
+
+    if (liburHariIni) {
+      return NextResponse.json({
+        success: false,
+        message: `Hari ini adalah hari libur: ${liburHariIni.keterangan}. Absensi tidak diperbolehkan.`,
+      }, { status: 403 })
+    }
+
+    // 🔒 Cek Hari Kerja
     const hariInggris = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
     const hariIni = hariInggris[now.getDay()]
     if (!pengaturan.hariKerja.includes(hariIni)) {
@@ -81,9 +102,7 @@ export async function POST(req: Request) {
       }, { status: 403 })
     }
 
-    const awalHari = new Date(now); awalHari.setHours(0, 0, 0, 0)
-    const akhirHari = new Date(now); akhirHari.setHours(23, 59, 59, 999)
-
+    // 🔍 Cek absensi hari ini
     const semuaAbsensiHariIni = await prisma.catatanAbsensi.findMany({
       where: {
         karyawanId: karyawan.id,

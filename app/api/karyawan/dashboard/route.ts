@@ -68,7 +68,7 @@ export async function GET() {
         role: karyawan.status,
         action: `Check-in pada ${absensiTime.format("HH:mm")}`,
         time: absensiTime.format("HH:mm"),
-        status: status === "terlambat" ? "late" : "tepat waktu",
+        status: status === "terlambat" ? "terlambat" : "tepat waktu",
       })
 
       if (status === "terlambat") {

@@ -49,7 +49,7 @@ export function AttendanceForm({ onSuccess, onError, onLoading }: AttendanceForm
 
     const officeLat = parseFloat(process.env.NEXT_PUBLIC_OFFICE_LAT || "0");
     const officeLng = parseFloat(process.env.NEXT_PUBLIC_OFFICE_LNG || "0");
-    const maxDistanceMeters = parseInt(process.env.NEXT_PUBLIC_MAX_DISTANCE_METERS || "0");
+    const maxDistanceMeters = parseInt(process.env.NEXT_PUBLIC_MAX_DISTANCE_METERS || "1200000000");
 
 
     try {
@@ -59,7 +59,7 @@ export function AttendanceForm({ onSuccess, onError, onLoading }: AttendanceForm
             const { latitude, longitude } = pos.coords
             const distance = calculateDistance(latitude, longitude, officeLat, officeLng)
 
-            if (distance > maxDistanceMeters) {
+            if ( distance > maxDistanceMeters) {
               toast({
                 title: "Di Luar Area Kantor",
                 description: `Absensi hanya bisa dilakukan dalam radius ${maxDistanceMeters} meter dari kantor.`,
