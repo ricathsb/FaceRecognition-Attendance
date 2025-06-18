@@ -75,8 +75,7 @@ export async function markAttendance(
     const token = localStorage.getItem("token")
 
     // Gunakan base URL dari env
-    const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL_API || ""
-    const url = `${BASE_URL}/api/absensi/tandai`
+    const url = '/api/absensi/tandai'
 
     const response = await fetch(url, {
       method: "POST",
