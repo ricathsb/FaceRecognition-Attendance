@@ -75,7 +75,9 @@ export async function markAttendance(
     const token = localStorage.getItem("token")
 
     // Gunakan base URL dari env
-    const url = '/api/absensi/tandai'
+    const baseUrl = typeof window === "undefined"
+    ? process.env.INTERNAL_API_URL
+    : "";    const url = `${baseUrl}/api/absensi/tandai`
 
     const response = await fetch(url, {
       method: "POST",
