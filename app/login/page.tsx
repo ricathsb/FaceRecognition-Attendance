@@ -40,16 +40,17 @@ export default function LoginPage() {
         }
 
         try {
-            const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL
+            const BASE_URL = "https://api.andreasmlbngaol.site"
             const res = await fetch(`${BASE_URL}/api/login`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({ identifier: email, password: password }),
             })
 
             const data = await res.json()
 
             if (res.ok) {
+                console.log(data.access_token)
                 // Simpan data user berdasarkan role menggunakan fungsi auth yang baru
                 setUserRole(data.role as "admin" | "user")
 
